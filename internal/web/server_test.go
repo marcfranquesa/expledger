@@ -7,28 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/marcfranquesa/expledger/internal/web"
-	"go.yaml.in/yaml/v3"
 )
 
 func TestExperiments(t *testing.T) {
-	root := t.TempDir()
-	writeExperiment(t, root, "z-earlier", experiment.Record{
-		ID: "z-earlier", Title: "Earlier experiment",
-		CreatedAt: time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC),
-	})
-	writeExperiment(t, root, "actual folder & notes", experiment.Record{
-		ID: "actual folder & notes", Title: `<script>alert("x")</script> & trial`,
-		CreatedAt: time.Date(2026, 9, 24, 9, 12, 3, 0, time.FixedZone("EDT", -4*60*60)),
-		BasedOn:   []string{"hidden-parent"},
-		Extra: map[string]yaml.Node{
-			"note": {Kind: yaml.ScalarNode, Tag: "!!str", Value: "hidden-metadata"},
-		},
-		Body: []byte("\n# Hidden Markdown body\n"),
-	})
+	root := filepath.Join("..", "..", "testdata", "project")
 	handler := web.NewHandler(root, "https://github.com/example/project", "research/next")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -37,10 +21,12 @@ func TestExperiments(t *testing.T) {
 	}
 	body := response.Body.String()
 	for _, want := range []string{
-		"&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; trial",
-		`href="https://github.com/example/project/tree/research%2Fnext/experiments/actual%20folder%20&amp;%20notes"`,
-		`datetime="2026-09-24T13:12:03Z"`,
-		"Sep 24, 2026 · 13:12:03 UTC",
+		"Unicode &amp; HTML: comparing café embeddings with α &lt; β across a deliberately long experiment title",
+		`href="https://github.com/example/project/tree/research%2Fnext/experiments/20260924-long-title"`,
+		`datetime="2026-09-24T11:45:00.123456789Z"`,
+		"Sep 24, 2026 · 11:45:00 UTC",
+		`datetime="2026-09-24T10:30:00Z"`,
+		"Sep 24, 2026 · 10:30:00 UTC",
 		"research/next",
 		filepath.Base(root),
 	} {
@@ -48,13 +34,18 @@ func TestExperiments(t *testing.T) {
 			t.Errorf("response missing %q", want)
 		}
 	}
-	for _, unwanted := range []string{"<script>", "Hidden Markdown body", "hidden-metadata", "hidden-parent", "/experiments/a-newer"} {
+	for _, unwanted := range []string{"fixture body", "Extra fixture metadata", "based_on"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("response contains %q", unwanted)
 		}
 	}
-	if newer, earlier := strings.Index(body, "actual folder &amp; notes"), strings.Index(body, "z-earlier"); newer < 0 || earlier < 0 || newer >= earlier {
-		t.Error("experiments are not ordered newest first")
+	position := -1
+	for _, id := range []string{"20260924-long-title", "20260924-variant", "20260924-baseline"} {
+		next := strings.Index(body, id)
+		if next <= position {
+			t.Fatalf("experiment %s is missing or not ordered newest first", id)
+		}
+		position = next
 	}
 	if got := response.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("Cache-Control = %q", got)
@@ -64,24 +55,67 @@ func TestExperiments(t *testing.T) {
 	}
 }
 
+func TestEscapesMetadataAndFolderURL(t *testing.T) {
+	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(root, "experiments", "actual folder & notes")
+	if err := os.Rename(filepath.Join(root, "experiments", "20260924-long-title"), folder); err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(folder, "README.md")
+	data, err := os.ReadFile(readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "title:") {
+			lines[i] = `title: '<script>alert("x")</script> & trial'`
+		}
+		if strings.HasPrefix(line, "id:") {
+			lines[i] = "id: actual folder & notes"
+		}
+	}
+	if err := os.WriteFile(readme, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := web.NewHandler(root, "https://github.com/example/project", "research/next")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	body := response.Body.String()
+	if response.Code != http.StatusOK ||
+		!strings.Contains(body, "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; trial") ||
+		!strings.Contains(body, `href="https://github.com/example/project/tree/research%2Fnext/experiments/actual%20folder%20&amp;%20notes"`) ||
+		strings.Contains(body, "<script>") || strings.Contains(body, "/experiments/20260924-long-title") {
+		t.Fatalf("incorrect escaping or folder URL: %d %s", response.Code, body)
+	}
+}
+
 func TestRefreshReadsCurrentFiles(t *testing.T) {
 	root := t.TempDir()
-	record := experiment.Record{
-		ID: "one", Title: "First title",
-		CreatedAt: time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC),
+	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+		t.Fatal(err)
 	}
-	writeExperiment(t, root, "one", record)
 	handler := web.NewHandler(root, "https://github.com/example/project", "main")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "First title") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
 		t.Fatalf("initial response: %d %s", response.Code, response.Body)
 	}
-	record.Title = "Updated title"
-	writeExperiment(t, root, "one", record)
+	readme := filepath.Join(root, "experiments", "20260924-baseline", "README.md")
+	data, err := os.ReadFile(readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "title: Baseline model", "title: Updated baseline", 1)
+	if err := os.WriteFile(readme, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Updated title") || strings.Contains(response.Body.String(), "First title") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Updated baseline") || strings.Contains(response.Body.String(), "Baseline model") {
 		t.Fatalf("refresh did not reflect changed files: %d %s", response.Code, response.Body)
 	}
 }
@@ -115,20 +149,5 @@ func TestEmptyCatalogAndRoutes(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", nil))
 	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != "GET, HEAD" {
 		t.Fatalf("POST response: %d %s", response.Code, response.Body)
-	}
-}
-
-func writeExperiment(t *testing.T, root, folder string, record experiment.Record) {
-	t.Helper()
-	dir := filepath.Join(root, "experiments", folder)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	data, err := record.Marshal()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), data, 0o644); err != nil {
-		t.Fatal(err)
 	}
 }

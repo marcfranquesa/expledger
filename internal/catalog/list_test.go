@@ -10,10 +10,7 @@ import (
 )
 
 func TestList(t *testing.T) {
-	root := t.TempDir()
-	writeListREADME(t, root, "20260924-baseline", "---\nid: 20260924-baseline\ntitle: Baseline\ncreated_at: 2026-09-24T10:00:00Z\n---\n# Baseline\n")
-	writeListREADME(t, root, "20260924-improved", "---\nid: 20260924-improved\ntitle: Improved model\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [20260924-baseline, 20260924-reference]\n---\n# Findings\n")
-	writeListREADME(t, root, "20260924-reference", "---\nid: 20260924-reference\ntitle: Reference\ncreated_at: 2026-09-24T09:00:00Z\n---\n")
+	root := filepath.Join("..", "..", "testdata", "project")
 
 	records, err := List(root)
 	if err != nil {
@@ -22,16 +19,16 @@ func TestList(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("records = %+v, want three experiments", records)
 	}
-	if records[0].ID != "20260924-improved" || records[0].Title != "Improved model" ||
-		!reflect.DeepEqual(records[0].BasedOn, []string{"20260924-baseline", "20260924-reference"}) ||
-		string(records[0].Body) != "# Findings\n" {
-		t.Fatalf("newest record = %+v, want improved model with its parents and body", records[0])
+	if records[0].ID != "20260924-long-title" || records[0].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" ||
+		!strings.Contains(string(records[0].Body), "Long-title fixture body") {
+		t.Fatalf("newest record = %+v, want long title and its body", records[0])
 	}
-	if records[1].ID != "20260924-baseline" || records[1].Title != "Baseline" || len(records[1].BasedOn) != 0 {
-		t.Fatalf("older record = %+v, want independent baseline", records[1])
+	if records[1].ID != "20260924-variant" || records[1].Title != "Lower learning rate" ||
+		!reflect.DeepEqual(records[1].BasedOn, []string{"20260924-baseline"}) {
+		t.Fatalf("middle record = %+v, want variant based on baseline", records[1])
 	}
-	if records[2].ID != "20260924-reference" {
-		t.Fatalf("oldest record = %+v, want reference", records[2])
+	if records[2].ID != "20260924-baseline" || records[2].Title != "Baseline model" || len(records[2].BasedOn) != 0 {
+		t.Fatalf("oldest record = %+v, want independent baseline", records[2])
 	}
 
 }

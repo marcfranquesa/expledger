@@ -14,15 +14,14 @@ import (
 
 func TestListFromNestedDirectory(t *testing.T) {
 	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+		t.Fatal(err)
+	}
 	git(t, root, "init", "--quiet")
 	cwd := filepath.Join(root, "src", "nested")
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeListRecord(t, root, "20260922-baseline", experiment.Record{ID: "20260922-baseline", Title: "Baseline", CreatedAt: time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)})
-	writeListRecord(t, root, "20260924-latest", experiment.Record{ID: "20260924-latest", Title: "Latest result", CreatedAt: time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC)})
-	writeListRecord(t, root, "20260923-middle", experiment.Record{ID: "20260923-middle", Title: "Middle\t title\ncontinued", CreatedAt: time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)})
-
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"list"}, cwd, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
@@ -30,9 +29,9 @@ func TestListFromNestedDirectory(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
 	want := []string{
 		"ID TITLE",
-		"20260924-latest Latest result",
-		"20260923-middle Middle title continued",
-		"20260922-baseline Baseline",
+		"20260924-long-title Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title",
+		"20260924-variant Lower learning rate",
+		"20260924-baseline Baseline model",
 	}
 	if len(lines) != len(want) {
 		t.Fatalf("list output = %q, want %d lines", stdout.String(), len(want))
@@ -41,6 +40,20 @@ func TestListFromNestedDirectory(t *testing.T) {
 		if got := strings.Join(strings.Fields(line), " "); got != want[i] {
 			t.Errorf("line %d = %q, want %q", i+1, got, want[i])
 		}
+	}
+}
+
+func TestListNormalizesWhitespace(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	writeListRecord(t, root, "20260924-record", experiment.Record{ID: "20260924-record", Title: "Messy\t title\ncontinued"})
+	var stdout bytes.Buffer
+	if err := cli.Run([]string{"list"}, root, time.Time{}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+	if len(lines) != 2 || strings.Join(strings.Fields(lines[1]), " ") != "20260924-record Messy title continued" {
+		t.Fatalf("list did not keep the record on one line: %q", stdout.String())
 	}
 }
 

@@ -100,6 +100,14 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
+Preview the checked-in fixture experiments:
+
+```sh
+./scripts/preview.sh --port 0
+```
+
+The script builds the CLI and serves a temporary Git repository, then removes it when stopped. Its placeholder GitHub links do not exist.
+
 The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
 
 - `internal/cli`: command arguments, orchestration, and terminal output.
