@@ -45,6 +45,13 @@ func Read(root, id string) (experiment.Record, error) {
 
 func readRecord(project *os.Root, id string) (experiment.Record, error) {
 	metadata := filepath.Join("experiments", id, "expledger.yaml")
+	info, err := project.Stat(metadata)
+	if err != nil {
+		return experiment.Record{}, fmt.Errorf("read %s: %w", metadata, err)
+	}
+	if !info.Mode().IsRegular() {
+		return experiment.Record{}, fmt.Errorf("read %s: metadata must be a regular file", metadata)
+	}
 	data, err := project.ReadFile(metadata)
 	if err != nil {
 		return experiment.Record{}, fmt.Errorf("read %s: %w", metadata, err)
