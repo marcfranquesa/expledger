@@ -16,7 +16,7 @@ Make sure Go's binary installation directory is on your `PATH`.
 
 | Name | Description |
 | --- | --- |
-| `expledger new <slug>` | Create a dated experiment folder and README at the Git working tree root. |
+| `expledger new <slug> [flags]` | Create a dated experiment folder and README at the Git working tree root. Use `--title` for a custom title and repeat `--based-on` for parent experiment IDs. |
 | `expledger help [command]` | Show general or command-specific help. Also available with `--help` or `-h`, such as `expledger new --help`. |
 
 ## Usage
@@ -27,9 +27,19 @@ From anywhere inside a Git working tree:
 expledger new my-idea
 ```
 
-Running `expledger` without arguments shows help.
-
 This creates `experiments/YYYYMMDD-my-idea/README.md` at that working tree's root and prints its path. The date uses your local time. Slugs contain lowercase letters, digits, and single hyphens between words. Existing experiments are never overwritten.
+
+Set a display title and record parent experiments with flags:
+
+```sh
+expledger new my-idea --title "My experiment" --based-on 20260920-baseline
+expledger new combined --based-on 20260920-baseline --based-on 20260921-alternative
+expledger new --help
+```
+
+`--title` defaults to a title derived from the slug. Each `--based-on` takes one parent experiment ID; repeat the flag for multiple parents. Both flags require nonempty values.
+
+Running `expledger` without arguments shows help.
 
 The README contains YAML `id` and `title` fields, followed by Markdown sections for the hypothesis, method, and finding. The ID stays fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
 

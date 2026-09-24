@@ -11,7 +11,7 @@ import (
 func TestCreate(t *testing.T) {
 	root := t.TempDir()
 	now := time.Date(2026, 9, 24, 23, 59, 0, 0, time.FixedZone("local", -4*60*60))
-	dir, err := Create(root, "my-idea", now)
+	dir, err := Create(root, "my-idea", now, CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestCreate(t *testing.T) {
 	if err := os.WriteFile(path, []byte("existing research notes"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Create(root, "my-idea", now); !errors.Is(err, os.ErrExist) {
+	if _, err := Create(root, "my-idea", now, CreateOptions{}); !errors.Is(err, os.ErrExist) {
 		t.Fatalf("duplicate creation error = %v, want os.ErrExist", err)
 	}
 	data, err = os.ReadFile(path)
@@ -53,7 +53,7 @@ func TestCreateRejectsInvalidSlugs(t *testing.T) {
 	for _, slug := range []string{"", "../outside", "/absolute", "a/b", `a\b`, "Upper", "a b", "a--b", "a_1", "-a", "a-"} {
 		t.Run(slug, func(t *testing.T) {
 			root := t.TempDir()
-			if _, err := Create(root, slug, time.Now()); err == nil {
+			if _, err := Create(root, slug, time.Now(), CreateOptions{}); err == nil {
 				t.Fatal("invalid slug accepted")
 			}
 			entries, err := os.ReadDir(root)
@@ -69,7 +69,7 @@ func TestCreateRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(root, "experiments")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Create(root, "baseline", time.Now()); err == nil {
+	if _, err := Create(root, "baseline", time.Now(), CreateOptions{}); err == nil {
 		t.Fatal("symlinked experiments directory accepted")
 	}
 	entries, err := os.ReadDir(outside)

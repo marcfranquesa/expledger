@@ -13,18 +13,28 @@ import (
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
+// CreateOptions supplies optional metadata for a new experiment.
+type CreateOptions struct {
+	Title   string // An empty title is derived from the slug.
+	BasedOn []string
+}
+
 // Create adds an experiment under root, using the date in now's location.
 // An existing experiment directory is never overwritten.
-func Create(root, slug string, now time.Time) (string, error) {
+func Create(root, slug string, now time.Time, opts CreateOptions) (string, error) {
 	if !slugPattern.MatchString(slug) {
 		return "", fmt.Errorf("invalid slug %q: use lowercase letters, digits, and single hyphens", slug)
 	}
 	id := now.Format("20060102") + "-" + slug
-	title := strings.ReplaceAll(slug, "-", " ")
-	title = strings.ToUpper(title[:1]) + title[1:]
+	title := opts.Title
+	if title == "" {
+		title = strings.ReplaceAll(slug, "-", " ")
+		title = strings.ToUpper(title[:1]) + title[1:]
+	}
 	record := Record{
 		ID: id, Title: title,
-		Body: []byte(fmt.Sprintf("\n# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)),
+		BasedOn: opts.BasedOn,
+		Body:    []byte(fmt.Sprintf("\n# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)),
 	}
 	data, err := record.Marshal()
 	if err != nil {
