@@ -143,7 +143,7 @@ func TestListRejectsMetadataOutsideProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(outside, "expledger.yaml")
-	if err := os.WriteFile(target, []byte("schema: expledger/v1\nid: outside\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n"), 0644); err != nil {
+	if err := os.WriteFile(target, []byte("schema: expledger/v1\nid: linked\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, filepath.Join(path, "expledger.yaml")); err != nil {
