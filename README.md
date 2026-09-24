@@ -54,6 +54,25 @@ based_on:
 
 `based_on` describes experiment ancestry. References are stored but are not yet resolved or checked for cycles. Independent experiments omit this field. There is no status field.
 
+## Agent skill
+
+After installing the CLI, link the [skill](skills/expledger/SKILL.md) from a
+persistent ExpLedger checkout. Run one of these from that checkout:
+
+**Per repository** (replace `/path/to/project`):
+
+```sh
+mkdir -p "/path/to/project/.agents/skills"
+ln -s "$PWD/skills/expledger" "/path/to/project/.agents/skills/expledger"
+```
+
+**Global** (all your repositories):
+
+```sh
+mkdir -p "$HOME/.agents/skills"
+ln -s "$PWD/skills/expledger" "$HOME/.agents/skills/expledger"
+```
+
 ## Development
 
 ```sh
