@@ -13,7 +13,7 @@ import (
 
 func TestExperiments(t *testing.T) {
 	root := filepath.Join("..", "..", "testdata", "project")
-	handler := web.NewHandler(root, "https://github.com/example/project/tree/research%2Fnext/experiments/", "research/next")
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "research/next"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK {
@@ -81,7 +81,7 @@ func TestEscapesMetadataAndFolderURL(t *testing.T) {
 	if err := os.WriteFile(readme, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, "https://github.com/example/project/tree/research%2Fnext/experiments/", "research/next")
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "research/next"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	body := response.Body.String()
@@ -98,7 +98,7 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, "https://github.com/example/project/tree/main/experiments/", "main")
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "main"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
@@ -120,12 +120,44 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	}
 }
 
+func TestRefreshRecoversAfterREADMERepair(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "experiments", "example")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(dir, "README.md")
+	if err := os.WriteFile(readme, []byte("invalid README"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := web.NewHandler(root, web.PageOptions{
+		Project: "Example", RepositoryURL: "https://github.com/example/project", Branch: "main",
+	})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "README.md") {
+		t.Fatalf("invalid README response: %d %s", response.Code, response.Body)
+	}
+	if response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("invalid README response may be cached")
+	}
+	content := "---\nid: example\ntitle: Repaired example\ncreated_at: 2026-09-24T12:00:00Z\n---\n"
+	if err := os.WriteFile(readme, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Repaired example") {
+		t.Fatalf("repaired README response: %d %s", response.Code, response.Body)
+	}
+}
+
 func TestEmptyCatalogAndRoutes(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("Private repository file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, "https://github.com/example/project/tree/main/experiments/", "main")
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "main"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No experiments yet") || !strings.Contains(response.Body.String(), "expledger new my-idea") {

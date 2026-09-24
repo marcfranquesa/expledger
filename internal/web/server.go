@@ -1,14 +1,22 @@
 package web
 
-import "net/http"
+import (
+	"net/http"
 
-// NewHandler reads the catalog on each request. remoteURLPrefix includes the
-// trailing slash before the experiment ID; branch is displayed in the page.
-func NewHandler(root, remoteURLPrefix, branch string) http.Handler {
+	"github.com/marcfranquesa/expledger/internal/catalog"
+)
+
+// NewHandler reads the catalog on each request using fixed page options.
+func NewHandler(root string, options PageOptions) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		body, err := Render(root, remoteURLPrefix, branch)
+		records, err := catalog.List(root)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		body, err := Render(records, options)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
