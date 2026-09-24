@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,26 @@ func newExperimentCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := experiment.NewID(args[0], app.now)
+			if err != nil {
+				return err
+			}
+			exists, err := catalog.Exists(app.repoRoot, id)
+			if err != nil {
+				return err
+			}
+			if exists {
+				return fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
+			}
+			for _, parent := range opts.BasedOn {
+				exists, err := catalog.Exists(app.repoRoot, parent)
+				if err != nil {
+					return fmt.Errorf("check parent experiment %q: %w", parent, err)
+				}
+				if !exists {
+					return fmt.Errorf("parent experiment %q does not exist", parent)
+				}
+			}
 			dir, err := experiment.Create(app.repoRoot, args[0], app.now, opts)
 			if err != nil {
 				return err

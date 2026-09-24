@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,6 +37,8 @@ func TestNewMetadataFlags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
+			createMetadataParent(t, root, "baseline", 20)
+			createMetadataParent(t, root, "comparison", 21)
 			var stdout bytes.Buffer
 			if err := cli.Run(tt.args, root, metadataTestTime(), &stdout); err != nil {
 				t.Fatal(err)
@@ -90,6 +93,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
+	createMetadataParent(t, root, "baseline", 20)
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatal(err)
@@ -107,6 +111,69 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(record.Body), "\n# Next idea\n") {
 		t.Fatalf("default README heading = %q", record.Body)
+	}
+}
+
+func TestNewRejectsMissingParent(t *testing.T) {
+	for _, withExistingParent := range []bool{false, true} {
+		name := "only parent missing"
+		if withExistingParent {
+			name = "second parent missing"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			const parent = "20260920-missing"
+			args := []string{"new", "my-idea"}
+			if withExistingParent {
+				createMetadataParent(t, root, "baseline", 20)
+				args = append(args, "--based-on", "20260920-baseline")
+			}
+			args = append(args, "--based-on", parent)
+			var stdout bytes.Buffer
+			err := cli.Run(args, root, metadataTestTime(), &stdout)
+			if err == nil || !strings.Contains(err.Error(), parent) {
+				t.Fatalf("expected error naming missing parent %q, got %v", parent, err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("failed command printed output: %q", stdout.String())
+			}
+			checkDir, wantEntry := root, ".git"
+			if withExistingParent {
+				checkDir = filepath.Join(root, "experiments")
+				wantEntry = "20260920-baseline"
+			}
+			entries, err := os.ReadDir(checkDir)
+			if err != nil || len(entries) != 1 || entries[0].Name() != wantEntry {
+				t.Fatalf("missing parent unexpectedly created files: entries=%v, err=%v", entries, err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsExistingExperiment(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	dir, err := experiment.Create(root, "my-idea", metadataTestTime(), experiment.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(dir, "README.md")
+	notes := []byte("# Existing research notes\n")
+	if err := os.WriteFile(readme, notes, 0644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	err = cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout)
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("duplicate error = %v, want os.ErrExist", err)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("failed command printed output: %q", stdout.String())
+	}
+	data, err := os.ReadFile(readme)
+	if err != nil || !bytes.Equal(data, notes) {
+		t.Fatalf("duplicate changed existing notes: data=%q, err=%v", data, err)
 	}
 }
 
@@ -144,6 +211,14 @@ func TestNewHelpDescribesMetadataFlags(t *testing.T) {
 
 func metadataTestTime() time.Time {
 	return time.Date(2026, time.September, 24, 12, 0, 0, 0, time.UTC)
+}
+
+func createMetadataParent(t *testing.T, root, slug string, day int) {
+	t.Helper()
+	now := time.Date(2026, time.September, day, 12, 0, 0, 0, time.UTC)
+	if _, err := experiment.Create(root, slug, now, experiment.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func readNewRecord(t *testing.T, root, slug string) experiment.Record {

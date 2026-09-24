@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -75,5 +76,37 @@ func TestCreateRejectsSymlink(t *testing.T) {
 	entries, err := os.ReadDir(outside)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("wrote through symlink: entries=%v, err=%v", entries, err)
+	}
+}
+
+func TestCreateStoresParentMetadata(t *testing.T) {
+	root := t.TempDir()
+	parents := []string{"baseline", "reference"}
+	dir, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(record.BasedOn, parents) {
+		t.Fatalf("based_on = %v, want %v", record.BasedOn, parents)
+	}
+}
+
+func TestNewIDUsesProvidedLocation(t *testing.T) {
+	now := time.Date(2026, 9, 24, 23, 59, 0, 0, time.FixedZone("local", -4*60*60))
+	id, err := NewID("baseline", now)
+	if err != nil || id != "20260924-baseline" {
+		t.Fatalf("local ID = %q, %v; want 20260924-baseline", id, err)
+	}
+	id, err = NewID("baseline", now.UTC())
+	if err != nil || id != "20260925-baseline" {
+		t.Fatalf("UTC ID = %q, %v; want 20260925-baseline", id, err)
 	}
 }
