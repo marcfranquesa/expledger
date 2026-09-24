@@ -12,6 +12,13 @@ go install ./cmd/expledger
 
 Make sure Go's binary installation directory is on your `PATH`.
 
+## Commands
+
+| Name | Description |
+| --- | --- |
+| `expledger new <slug>` | Create a dated experiment folder and README at the Git working tree root. |
+| `expledger help` | Show usage. Also available as `expledger --help` or `expledger -h`. |
+
 ## Usage
 
 From anywhere inside a Git working tree:
