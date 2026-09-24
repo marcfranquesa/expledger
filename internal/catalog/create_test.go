@@ -179,8 +179,8 @@ func TestCreateStoresParentMetadata(t *testing.T) {
 	}
 }
 
-func TestCreateUsesProvidedLocation(t *testing.T) {
-	now := time.Date(2026, 9, 24, 23, 59, 0, 0, time.FixedZone("local", -4*60*60))
+func TestCreateUsesLocalDateAndUTCTimestamp(t *testing.T) {
+	now := time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("local", -4*60*60))
 	for _, tt := range []struct {
 		name string
 		now  time.Time
@@ -203,33 +203,13 @@ func TestCreateUsesProvidedLocation(t *testing.T) {
 			if err != nil || record.ID != tt.id {
 				t.Fatalf("record ID = %q, err=%v; want %q", record.ID, err, tt.id)
 			}
+			if !record.CreatedAt.Equal(tt.now) {
+				t.Fatalf("creation timestamp = %s, want %s", record.CreatedAt, tt.now)
+			}
+			if !bytes.Contains(data, []byte("created_at: 2026-09-25T03:59:00.123456789Z\n")) {
+				t.Fatalf("metadata does not contain precise UTC timestamp: %s", data)
+			}
 		})
-	}
-}
-
-func TestCreateRecordsUTCTimestampWithLocalDate(t *testing.T) {
-	root := t.TempDir()
-	now := time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("local", -4*60*60))
-	dir, err := Create(root, "timestamp", now, CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := filepath.Join(root, "experiments", "20260924-timestamp"); dir != want {
-		t.Fatalf("directory = %q, want %q", dir, want)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "expledger.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	record, err := experiment.Parse(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if record.ID != "20260924-timestamp" || !record.CreatedAt.Equal(now) {
-		t.Fatalf("creation metadata = %s, %s; want local date ID and %s", record.ID, record.CreatedAt, now)
-	}
-	if !bytes.Contains(data, []byte("created_at: 2026-09-25T03:59:00.123456789Z\n")) {
-		t.Fatalf("Metadata does not contain precise UTC timestamp: %s", data)
 	}
 }
 
