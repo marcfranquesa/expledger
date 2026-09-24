@@ -17,8 +17,7 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	if record.ID != "example" || record.Title != "Example" || record.CreatedAt.IsZero() ||
-		len(record.BasedOn) != 1 || record.BasedOn[0] != "missing" ||
-		record.Extra["custom"].Value != "keep-me" {
+		len(record.BasedOn) != 1 || record.BasedOn[0] != "missing" {
 		t.Fatalf("unexpected record: %+v", record)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "experiments", "example", "expledger.yaml"))

@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -56,41 +55,6 @@ func TestMarshalPreservesRepresentableCreatedAt(t *testing.T) {
 	}
 }
 
-func TestMarshalPreservesEmptyNullMetadata(t *testing.T) {
-	for _, custom := range []string{
-		"{0}",
-		"{nested: [{key: }, {!!null '': !!null ''}], empty_string: ''}",
-		"",
-	} {
-		t.Run(custom, func(t *testing.T) {
-			data := []byte("schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: " + custom + "\n")
-			before, err := Parse(data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			original, err := Parse(data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			encoded, err := before.Marshal()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(before.Extra, original.Extra) {
-				t.Fatal("Marshal mutated caller-owned metadata nodes")
-			}
-			after, err := Parse(encoded)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want, got := before.Extra["custom"], after.Extra["custom"]
-			if !sameYAMLValue(&want, &got) {
-				t.Fatalf("round trip changed null metadata: %s", encoded)
-			}
-		})
-	}
-}
-
 func FuzzRecordRoundTrip(f *testing.F) {
 	for _, data := range []string{
 		"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n",
@@ -116,15 +80,6 @@ func FuzzRecordRoundTrip(f *testing.F) {
 		}
 		if before.Schema != after.Schema || before.ID != after.ID || before.Title != after.Title || !before.CreatedAt.Equal(after.CreatedAt) || !slices.Equal(before.BasedOn, after.BasedOn) {
 			t.Fatalf("round trip changed record: before=%+v, after=%+v", before, after)
-		}
-		if len(before.Extra) != len(after.Extra) {
-			t.Fatalf("round trip changed extra metadata count: before=%d, after=%d", len(before.Extra), len(after.Extra))
-		}
-		for key, value := range before.Extra {
-			got, exists := after.Extra[key]
-			if !exists || !sameYAMLValue(&value, &got) {
-				t.Errorf("round trip changed extra field %q: before=%+v, after=%+v", key, value, got)
-			}
 		}
 	})
 }

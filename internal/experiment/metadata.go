@@ -20,17 +20,16 @@ var createdAtPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:
 const Schema = "expledger/v1"
 
 // Record holds an experiment's structured metadata.
-// Extra retains metadata fields added by people or later versions of ExpLedger.
 type Record struct {
-	Schema    string               `yaml:"schema"`
-	ID        string               `yaml:"id"`
-	Title     string               `yaml:"title"`
-	CreatedAt time.Time            `yaml:"created_at"`
-	BasedOn   []string             `yaml:"based_on,omitempty"`
-	Extra     map[string]yaml.Node `yaml:",inline"`
+	Schema    string    `yaml:"schema"`
+	ID        string    `yaml:"id"`
+	Title     string    `yaml:"title"`
+	CreatedAt time.Time `yaml:"created_at"`
+	BasedOn   []string  `yaml:"based_on,omitempty"`
 }
 
 // Parse reads a single YAML metadata document with the supported schema.
+// Custom fields are accepted but not retained in the record.
 func Parse(data []byte) (Record, error) {
 	var node yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
@@ -86,38 +85,16 @@ func Parse(data []byte) (Record, error) {
 	return record, nil
 }
 
-// Marshal encodes one YAML metadata document.
-// YAML formatting and comments are not retained when metadata is re-encoded.
+// Marshal encodes the record's standard fields as one YAML metadata document.
 func (r Record) Marshal() ([]byte, error) {
 	if err := r.validate(); err != nil {
 		return nil, err
 	}
-	extra := make(map[string]yaml.Node, len(r.Extra))
-	for key, node := range r.Extra {
-		extra[key] = withExplicitNulls(node)
-	}
-	r.Extra = extra
 	metadata, err := yaml.Marshal(r)
 	if err != nil {
 		return nil, fmt.Errorf("encode metadata: %w", err)
 	}
 	return metadata, nil
-}
-
-func withExplicitNulls(node yaml.Node) yaml.Node {
-	// yaml.v3 otherwise emits empty nulls in flow collections as empty strings.
-	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" && node.Value == "" {
-		node.Style |= yaml.TaggedStyle
-	}
-	if node.Content != nil {
-		content := make([]*yaml.Node, len(node.Content))
-		for i, child := range node.Content {
-			copy := withExplicitNulls(*child)
-			content[i] = &copy
-		}
-		node.Content = content
-	}
-	return node
 }
 
 func (r Record) validate() error {
@@ -147,21 +124,10 @@ func (r Record) validate() error {
 			return errors.New("based_on entries must be nonempty strings")
 		}
 	}
-	for _, key := range []string{"schema", "id", "title", "created_at", "based_on"} {
-		if _, exists := r.Extra[key]; exists {
-			return fmt.Errorf("extra metadata cannot override %s", key)
-		}
-	}
-	for _, value := range r.Extra {
-		if err := validateYAML(&value); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 func validateYAML(node *yaml.Node) error {
-	// Explicit fields keep references valid when metadata is re-encoded.
 	if node.Kind == yaml.AliasNode || node.Tag == "!!merge" {
 		return errors.New("metadata requires explicit values; YAML aliases and merge keys are unsupported")
 	}

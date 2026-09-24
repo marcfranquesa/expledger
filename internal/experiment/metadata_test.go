@@ -5,8 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.yaml.in/yaml/v3"
 )
 
 func TestRecordRoundTrip(t *testing.T) {
@@ -29,11 +27,21 @@ func TestRecordRoundTrip(t *testing.T) {
 	if got.Schema != record.Schema || got.ID != record.ID || got.Title != record.Title || !reflect.DeepEqual(got.BasedOn, record.BasedOn) {
 		t.Fatalf("round trip changed record: got=%+v, want=%+v", got, record)
 	}
-	for _, key := range []string{"tags", "seed", "payload"} {
-		before, after := record.Extra[key], got.Extra[key]
-		if !sameYAMLValue(&before, &after) {
-			t.Errorf("round trip changed unknown field %q: before=%+v, after=%+v", key, before, after)
-		}
+}
+
+func TestParseAcceptsCustomMetadata(t *testing.T) {
+	for _, custom := range []string{
+		"",
+		"{0}",
+		"{nested: [{key: }, {!!null '': !!null ''}], empty_string: ''}",
+		"!future {tags: [analysis, ml], enabled: true, seed: 18446744073709551617, payload: !!binary SGVsbG8=}",
+	} {
+		t.Run(custom, func(t *testing.T) {
+			data := []byte("schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: " + custom + "\n")
+			if _, err := Parse(data); err != nil {
+				t.Fatalf("Parse custom metadata: %v", err)
+			}
+		})
 	}
 }
 
@@ -42,40 +50,34 @@ func TestParseRejectsMalformedRecords(t *testing.T) {
 		data string
 		want string
 	}{
-		"empty":          {"", "parse metadata"},
-		"not a mapping":  {"---\n- example\n", "YAML mapping"},
-		"invalid YAML":   {"schema: expledger/v1\nid: [\n", "parse metadata"},
-		"missing id":     {"schema: expledger/v1\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id is required"},
-		"missing title":  {"schema: expledger/v1\nid: example\ncreated_at: 2026-09-24T12:00:00Z\n", "title is required"},
-		"empty id":       {"schema: expledger/v1\nid: ' '\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id is required"},
-		"empty title":    {"schema: expledger/v1\nid: example\ntitle: ' '\ncreated_at: 2026-09-24T12:00:00Z\n", "title is required"},
-		"numeric id":     {"schema: expledger/v1\nid: 42\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id must be a string"},
-		"numeric title":  {"schema: expledger/v1\nid: example\ntitle: 42\ncreated_at: 2026-09-24T12:00:00Z\n", "title must be a string"},
-		"scalar parents": {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: previous\n", "based_on"},
-		"numeric parent": {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [42]\n", "based_on"},
-		"empty parent":   {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: ['']\n", "based_on"},
-		"duplicate key":  {"schema: expledger/v1\nid: one\nid: two\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "already defined"},
-		"null key":       {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nnull: keep-me\n", "metadata keys must be strings"},
-		"numeric key":    {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n42: keep-me\n", "metadata keys must be strings"},
-		"binary key":     {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n!!binary eA==: first\nx: second\n", "metadata keys must be strings"},
-		"trailing YAML":  {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n...\nlost: value\n", "exactly one YAML document"},
-		"alias":          {"schema: expledger/v1\nid: &id example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: *id\n", "YAML aliases and merge keys are unsupported"},
-		"merge":          {"schema: expledger/v1\ncreated_at: 2026-09-24T12:00:00Z\n<<: {id: example, title: Example}\n", "YAML aliases and merge keys are unsupported"},
+		"empty":                {"", "parse metadata"},
+		"not a mapping":        {"---\n- example\n", "YAML mapping"},
+		"invalid YAML":         {"schema: expledger/v1\nid: [\n", "parse metadata"},
+		"missing id":           {"schema: expledger/v1\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id is required"},
+		"missing title":        {"schema: expledger/v1\nid: example\ncreated_at: 2026-09-24T12:00:00Z\n", "title is required"},
+		"empty id":             {"schema: expledger/v1\nid: ' '\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id is required"},
+		"empty title":          {"schema: expledger/v1\nid: example\ntitle: ' '\ncreated_at: 2026-09-24T12:00:00Z\n", "title is required"},
+		"numeric id":           {"schema: expledger/v1\nid: 42\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "id must be a string"},
+		"numeric title":        {"schema: expledger/v1\nid: example\ntitle: 42\ncreated_at: 2026-09-24T12:00:00Z\n", "title must be a string"},
+		"scalar parents":       {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: previous\n", "based_on"},
+		"numeric parent":       {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [42]\n", "based_on"},
+		"empty parent":         {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: ['']\n", "based_on"},
+		"duplicate key":        {"schema: expledger/v1\nid: one\nid: two\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "already defined"},
+		"duplicate custom key": {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: one\ncustom: two\n", "already defined"},
+		"null key":             {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nnull: keep-me\n", "metadata keys must be strings"},
+		"numeric key":          {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n42: keep-me\n", "metadata keys must be strings"},
+		"binary key":           {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n!!binary eA==: first\nx: second\n", "metadata keys must be strings"},
+		"trailing YAML":        {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n...\nlost: value\n", "exactly one YAML document"},
+		"alias":                {"schema: expledger/v1\nid: &id example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: *id\n", "YAML aliases and merge keys are unsupported"},
+		"merge":                {"schema: expledger/v1\ncreated_at: 2026-09-24T12:00:00Z\n<<: {id: example, title: Example}\n", "YAML aliases and merge keys are unsupported"},
+		"nested alias":         {"schema: expledger/v1\nid: &id example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: {nested: [*id]}\n", "YAML aliases and merge keys are unsupported"},
+		"nested merge":         {"schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: {nested: [{<<: {key: value}}]}\n", "YAML aliases and merge keys are unsupported"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := Parse([]byte(tt.data)); err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("error = %v, want %q", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestMarshalRejectsReservedExtraFields(t *testing.T) {
-	for _, key := range []string{"schema", "id", "title", "created_at", "based_on"} {
-		r := Record{Schema: Schema, ID: "example", Title: "Example", CreatedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC), Extra: map[string]yaml.Node{key: {Kind: yaml.ScalarNode, Tag: "!!str", Value: "other"}}}
-		if _, err := r.Marshal(); err == nil || !strings.Contains(err.Error(), "extra metadata cannot override "+key) {
-			t.Fatalf("error = %v, want reserved %s error", err, key)
-		}
 	}
 }
 
@@ -104,16 +106,4 @@ func TestParseRejectsAdditionalYAMLDocuments(t *testing.T) {
 			t.Fatalf("Parse error = %v, want multiple document error", err)
 		}
 	}
-}
-
-func sameYAMLValue(a, b *yaml.Node) bool {
-	if a.Kind != b.Kind || a.Tag != b.Tag || a.Value != b.Value || len(a.Content) != len(b.Content) {
-		return false
-	}
-	for i := range a.Content {
-		if !sameYAMLValue(a.Content[i], b.Content[i]) {
-			return false
-		}
-	}
-	return true
 }

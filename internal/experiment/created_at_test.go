@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go.yaml.in/yaml/v3"
 )
 
 func TestCreatedAtRoundTrip(t *testing.T) {
@@ -23,9 +21,6 @@ func TestCreatedAtRoundTrip(t *testing.T) {
 			want := time.Date(2026, 9, 25, 3, 59, 0, 123456789, time.UTC)
 			if !record.CreatedAt.Equal(want) {
 				t.Fatalf("parsed timestamp changed: time=%s", record.CreatedAt)
-			}
-			if _, exists := record.Extra["created_at"]; exists {
-				t.Fatal("created_at retained as extra metadata")
 			}
 			encoded, err := record.Marshal()
 			if err != nil {
@@ -76,14 +71,5 @@ func TestParseRejectsInvalidCreatedAt(t *testing.T) {
 				t.Fatalf("error = %v, want created_at format error", err)
 			}
 		})
-	}
-}
-
-func TestMarshalRejectsCreatedAtInExtra(t *testing.T) {
-	record := Record{Schema: Schema, ID: "example", Title: "Example", CreatedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC), Extra: map[string]yaml.Node{
-		"created_at": {Kind: yaml.ScalarNode, Tag: "!!str", Value: "2026-09-24T23:59:00Z"},
-	}}
-	if _, err := record.Marshal(); err == nil || !strings.Contains(err.Error(), "extra metadata cannot override created_at") {
-		t.Fatalf("error = %v, want reserved created_at error", err)
 	}
 }

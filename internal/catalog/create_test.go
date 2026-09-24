@@ -40,10 +40,6 @@ func TestCreate(t *testing.T) {
 	if err != nil || string(readme) != "# My idea\n\n## Hypothesis\n\n## Method\n\n## Finding\n" {
 		t.Fatalf("unexpected notes: %q, %v", readme, err)
 	}
-	if _, exists := record.Extra["status"]; exists {
-		t.Fatal("unexpected status field")
-	}
-
 	if err := os.WriteFile(path, []byte("existing research notes"), 0644); err != nil {
 		t.Fatal(err)
 	}
