@@ -1,3 +1,4 @@
+// Package experiment defines experiment records and their README format.
 package experiment
 
 import (

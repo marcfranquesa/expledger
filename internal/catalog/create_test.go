@@ -1,12 +1,17 @@
-package experiment
+package catalog
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 func TestCreate(t *testing.T) {
@@ -24,7 +29,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record, err := Parse(data)
+	record, err := experiment.Parse(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +161,10 @@ func TestCreateRequiresProjectDirectory(t *testing.T) {
 
 func TestCreateStoresParentMetadata(t *testing.T) {
 	root := t.TempDir()
-	parents := []string{"baseline", "reference"}
+	parents := []string{"baseline", "Existing café notes"}
+	for _, parent := range parents {
+		writeListREADME(t, root, parent, fmt.Sprintf("---\nid: %q\ntitle: Parent\ncreated_at: 2026-09-24T12:00:00Z\n---\n", parent))
+	}
 	dir, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +173,7 @@ func TestCreateStoresParentMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record, err := Parse(data)
+	record, err := experiment.Parse(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,9 +202,140 @@ func TestCreateUsesProvidedLocation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			record, err := Parse(data)
+			record, err := experiment.Parse(data)
 			if err != nil || record.ID != tt.id {
 				t.Fatalf("record ID = %q, err=%v; want %q", record.ID, err, tt.id)
+			}
+		})
+	}
+}
+
+func TestCreateRecordsUTCTimestampWithLocalDate(t *testing.T) {
+	root := t.TempDir()
+	now := time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("local", -4*60*60))
+	dir, err := Create(root, "timestamp", now, CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(root, "experiments", "20260924-timestamp"); dir != want {
+		t.Fatalf("directory = %q, want %q", dir, want)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := experiment.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.ID != "20260924-timestamp" || !record.CreatedAt.Equal(now) {
+		t.Fatalf("creation metadata = %s, %s; want local date ID and %s", record.ID, record.CreatedAt, now)
+	}
+	if !bytes.Contains(data, []byte("created_at: 2026-09-25T03:59:00.123456789Z\n")) {
+		t.Fatalf("README does not contain precise UTC timestamp: %s", data)
+	}
+}
+
+func TestCreateRejectsMissingParent(t *testing.T) {
+	for _, withExistingParent := range []bool{false, true} {
+		t.Run(fmt.Sprint(withExistingParent), func(t *testing.T) {
+			root := t.TempDir()
+			parents := []string{"missing"}
+			if withExistingParent {
+				writeListREADME(t, root, "baseline", "---\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
+				parents = []string{"baseline", "missing"}
+			}
+			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: parents}); dir != "" || !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), `check parent experiment "missing"`) {
+				t.Fatalf("Create = %q, %v; want missing parent error", dir, err)
+			}
+			checkDir, wantCount := root, 0
+			if withExistingParent {
+				checkDir, wantCount = filepath.Join(root, "experiments"), 1
+			}
+			entries, err := os.ReadDir(checkDir)
+			if err != nil || len(entries) != wantCount || (wantCount == 1 && entries[0].Name() != "baseline") {
+				t.Fatalf("missing parent changed project: entries=%v, err=%v", entries, err)
+			}
+		})
+	}
+}
+
+func TestCreateRejectsInvalidParentRecord(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		folder string
+		readme string
+	}{
+		{name: "missing README", folder: "baseline"},
+		{name: "malformed README", folder: "baseline", readme: "---\nid: [\n---\n"},
+		{name: "mismatched ID", folder: "baseline", readme: "---\nid: other\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n---\n"},
+		{name: "case mismatched folder", folder: "Baseline", readme: "---\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n---\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeListREADME(t, root, tt.folder, tt.readme)
+			readme := filepath.Join(root, "experiments", tt.folder, "README.md")
+			if tt.readme == "" {
+				if err := os.Remove(readme); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"baseline"}}); dir != "" || err == nil || !strings.Contains(err.Error(), `check parent experiment "baseline"`) {
+				t.Fatalf("Create = %q, %v; want invalid parent error", dir, err)
+			}
+			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
+			if err != nil || len(entries) != 1 || entries[0].Name() != tt.folder {
+				t.Fatalf("invalid parent changed project: entries=%v, err=%v", entries, err)
+			}
+			data, err := os.ReadFile(readme)
+			if tt.readme == "" {
+				if !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("missing parent README created: err=%v", err)
+				}
+			} else if err != nil || string(data) != tt.readme {
+				t.Fatalf("invalid parent README changed: data=%q, err=%v", data, err)
+			}
+		})
+	}
+}
+
+func TestCreateChecksOnlyDirectParents(t *testing.T) {
+	for _, parents := range [][]string{nil, {"baseline"}} {
+		t.Run(fmt.Sprint(parents), func(t *testing.T) {
+			root := t.TempDir()
+			writeListREADME(t, root, "baseline", "---\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [missing-ancestor]\n---\n")
+			writeListREADME(t, root, "unrelated", "not valid front matter\n")
+			dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: parents})
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := Read(root, filepath.Base(dir))
+			if err != nil || !reflect.DeepEqual(record.BasedOn, parents) {
+				t.Fatalf("created record = %+v, %v; want parents %v", record, err, parents)
+			}
+			data, err := os.ReadFile(filepath.Join(root, "experiments", "unrelated", "README.md"))
+			if err != nil || string(data) != "not valid front matter\n" {
+				t.Fatalf("creation changed unrelated README: data=%q, err=%v", data, err)
+			}
+		})
+	}
+}
+
+func TestCreateRejectsInvalidMetadataBeforeWriting(t *testing.T) {
+	for _, opts := range []CreateOptions{
+		{Title: " \t"},
+		{BasedOn: []string{""}},
+		{BasedOn: []string{"../outside"}},
+		{BasedOn: []string{`nested\parent`}},
+	} {
+		t.Run(fmt.Sprint(opts), func(t *testing.T) {
+			root := t.TempDir()
+			if dir, err := Create(root, "child", time.Now(), opts); dir != "" || err == nil {
+				t.Fatalf("Create = %q, %v; want invalid metadata error", dir, err)
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("invalid metadata changed project: entries=%v, err=%v", entries, err)
 			}
 		})
 	}

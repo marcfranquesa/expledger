@@ -1,5 +1,4 @@
-// Package experiment manages experiment records and their directories.
-package experiment
+package catalog
 
 import (
 	"errors"
@@ -9,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
@@ -20,7 +21,8 @@ type CreateOptions struct {
 }
 
 // Create adds an experiment under root, using the date in now's location.
-// Callers validate parent references. Existing paths are never overwritten.
+// Only the named direct parents are validated; ancestors and unrelated records
+// are not read. Invalid inputs do not change files. Existing paths are never overwritten.
 func Create(root, slug string, now time.Time, opts CreateOptions) (string, error) {
 	if !slugPattern.MatchString(slug) {
 		return "", fmt.Errorf("invalid slug %q: use lowercase letters, digits, and single hyphens", slug)
@@ -31,7 +33,7 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 		title = strings.ReplaceAll(slug, "-", " ")
 		title = strings.ToUpper(title[:1]) + title[1:]
 	}
-	record := Record{
+	record := experiment.Record{
 		ID: id, Title: title,
 		CreatedAt: now.UTC(),
 		BasedOn:   opts.BasedOn,
@@ -40,6 +42,11 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	data, err := record.Marshal()
 	if err != nil {
 		return "", err
+	}
+	for _, parent := range opts.BasedOn {
+		if _, err := Read(root, parent); err != nil {
+			return "", fmt.Errorf("check parent experiment %q: %w", parent, err)
+		}
 	}
 	fs, err := os.OpenRoot(root)
 	if err != nil {
