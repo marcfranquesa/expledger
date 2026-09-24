@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -14,12 +15,13 @@ import (
 )
 
 type application struct {
+	cwd      string
 	repoRoot string
 	now      time.Time
 }
 
 func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
-	app := &application{now: now}
+	app := &application{cwd: cwd, now: now}
 	root := &cobra.Command{
 		Use:           "expledger",
 		Short:         rootDescription,
@@ -40,7 +42,7 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 	}
 	root.SetArgs(append([]string{}, args...))
 	root.SetOut(stdout)
-	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), serveExperimentsCommand(app))
+	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), buildExperimentsCommand(app), serveExperimentsCommand(app))
 	return root.Execute()
 }
 
@@ -69,4 +71,44 @@ func gitOutput(cwd string, args ...string) (string, error) {
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	output, err := cmd.Output()
 	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), err
+}
+
+func githubLocation(root string) (remoteURLPrefix, branch string, err error) {
+	remote, err := gitOutput(root, "remote", "get-url", "origin")
+	if err != nil {
+		return "", "", fmt.Errorf("GitHub links require an origin remote pointing to GitHub: %w", err)
+	}
+	repositoryURL, err := githubRepositoryURL(remote)
+	if err != nil {
+		return "", "", err
+	}
+	branch, err = gitOutput(root, "branch", "--show-current")
+	if err != nil {
+		return "", "", fmt.Errorf("read current Git branch: %w", err)
+	}
+	if branch == "" {
+		return "", "", errors.New("GitHub links require a checked-out branch; switch to a branch and try again")
+	}
+	return repositoryURL + "/tree/" + url.PathEscape(branch) + "/experiments/", branch, nil
+}
+
+func githubRepositoryURL(remote string) (string, error) {
+	if host, path, ok := strings.Cut(remote, ":"); ok && strings.EqualFold(host, "git@github.com") {
+		remote = "ssh://git@github.com/" + path
+	}
+	u, err := url.Parse(remote)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "ssh") || !strings.EqualFold(u.Hostname(), "github.com") || u.RawQuery != "" || u.Fragment != "" {
+		return "", errors.New("origin must be a GitHub HTTPS or SSH remote")
+	}
+	parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(u.Path, "/"), "/"), "/")
+	if len(parts) != 2 {
+		return "", errors.New("origin must point to a GitHub repository (owner/repository)")
+	}
+	parts[1] = strings.TrimSuffix(parts[1], ".git")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return "", errors.New("origin must point to a GitHub repository (owner/repository)")
+		}
+	}
+	return "https://github.com/" + url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1]), nil
 }

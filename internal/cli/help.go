@@ -21,6 +21,14 @@ Display IDs and titles by created_at, newest first.
 Each README's YAML id must exactly match its experiment folder name.
 Report missing or invalid experiment READMEs with their file path.`
 
+const buildDescription = "Build a static experiment web page"
+
+const buildDetails = `Write a self-contained index.html snapshot, newest experiments first.
+Create the output directory if needed and replace its index.html on each build.
+Other files in the directory are left unchanged. GitHub links use the origin
+remote and current branch; they assume the experiment folders are published.
+The generated page needs no Git checkout or running ExpLedger server.`
+
 const serveDescription = "Browse experiments in a local web page"
 
 const serveDetails = `Serve experiment titles and creation times, newest first, on 127.0.0.1.
