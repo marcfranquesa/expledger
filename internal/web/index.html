@@ -50,7 +50,7 @@
           <code class="id">{{.ID}}</code>
           <time datetime="{{.DateTime}}">{{.CreatedAt}}</time>
         </div>
-        <a class="github" href="{{.GitHubURL}}" aria-label="View {{.Title}} on GitHub">View on GitHub <span aria-hidden="true">↗</span></a>
+        <a class="github" href="{{.GitHubURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>
       </li>
       {{end}}
     </ol>

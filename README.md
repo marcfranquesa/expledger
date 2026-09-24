@@ -71,7 +71,7 @@ expledger serve
 
 Open the printed URL (default `http://127.0.0.1:8080`) to browse titles and creation times, newest first. Refresh to reload records; press Ctrl+C to stop. Use `--port <port>` to change the port, or `--port 0` to choose an available one.
 
-"View on GitHub" links use the GitHub `origin` remote, the branch checked out when the server starts, and each experiment's folder path. They assume those folders are already published on that branch. Only YAML metadata is displayed.
+"View remote" opens a new tab using the GitHub `origin` remote, the branch checked out when the server starts, and each experiment's folder path. Links assume those folders are already published on that branch. Only YAML metadata is displayed.
 
 ## Agent skill
 
