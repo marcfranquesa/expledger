@@ -54,7 +54,7 @@ go run ./cmd/expledger --help
 Open a shell in a temporary fixture project to try the installed CLI:
 
 ```sh
-./scripts/setup-test-project.sh
+./scripts/playground.sh
 ```
 
 Run `expledger list` or other commands there; `exit` returns to your previous shell.
