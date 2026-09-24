@@ -86,12 +86,3 @@ The internal packages keep these boundaries: `experiment` owns the record and
 codec; `catalog` owns reading, discovery, and creation; `web` owns rendering and
 HTTP handling; `cli` owns command orchestration and Git context. Records remain
 ordinary files; no separate index or database is required.
-
-## Format transition
-
-This is a breaking change from README front matter. Existing README-only records
-are ignored by discovery and cannot be used as parents or validated. There is no
-legacy fallback, automatic conversion, or migration command. To use an existing
-experiment, explicitly create `expledger.yaml` with the schema and fields above.
-The metadata file is authoritative; front matter remaining in a README is inert
-and can be removed manually if it is no longer useful.
