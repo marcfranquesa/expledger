@@ -152,25 +152,30 @@ func TestRootHelp(t *testing.T) {
 	}
 }
 
-func TestNewHelp(t *testing.T) {
-	for _, args := range [][]string{
-		{"help", "new"},
-		{"new", "--help"},
-		{"new", "-h"},
-		{"new", "my-idea", "--help"},
+func TestCommandHelp(t *testing.T) {
+	for _, command := range []struct{ name, argument string }{
+		{"new", "<slug>"},
+		{"validate", "<id>"},
 	} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			root := t.TempDir()
-			t.Setenv("PATH", t.TempDir())
-			var stdout bytes.Buffer
-			if err := cli.Run(args, root, time.Now(), &stdout); err != nil {
-				t.Fatal(err)
-			}
-			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger new <slug>") {
-				t.Fatalf("new help does not describe command usage: %q", got)
-			}
-			assertEmptyDirectory(t, root)
-		})
+		for _, args := range [][]string{
+			{"help", command.name},
+			{command.name, "--help"},
+			{command.name, "-h"},
+			{command.name, "example", "--help"},
+		} {
+			t.Run(strings.Join(args, " "), func(t *testing.T) {
+				root := t.TempDir()
+				t.Setenv("PATH", t.TempDir())
+				var stdout bytes.Buffer
+				if err := cli.Run(args, root, time.Now(), &stdout); err != nil {
+					t.Fatal(err)
+				}
+				if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger "+command.name+" "+command.argument) {
+					t.Fatalf("help does not describe command usage: %q", got)
+				}
+				assertEmptyDirectory(t, root)
+			})
+		}
 	}
 }
 
@@ -231,6 +236,9 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 		{"new", "my-idea", "another-idea"},
 		{"new", "my-idea", "--title", ""},
 		{"new", "my-idea", "--title", " \t "},
+		{"validate"},
+		{"validate", "selected", "another-id"},
+		{"validate", "selected", "--unknown"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			root := t.TempDir()
@@ -242,6 +250,9 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), "find Git working tree") {
 				t.Fatalf("Git lookup ran before argument validation: %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("invalid command printed output: %q", stdout.String())
 			}
 			assertEmptyDirectory(t, root)
 		})
@@ -294,4 +305,17 @@ func git(t *testing.T, cwd string, args ...string) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
+}
+
+func writeREADME(t *testing.T, root, id string, data []byte) string {
+	t.Helper()
+	dir := filepath.Join(root, "experiments", id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(dir, "README.md")
+	if err := os.WriteFile(readme, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return readme
 }

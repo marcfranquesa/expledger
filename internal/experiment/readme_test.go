@@ -3,14 +3,16 @@ package experiment
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
 
 func TestRecordRoundTrip(t *testing.T) {
 	body := []byte("\r\n# Human notes\r\n\r\n---\r\nKeep this exactly.  \n")
-	data := append([]byte("---\r\nid: 20260924-example\r\ntitle: 'Example: a study'\r\nbased_on:\r\n  - 20260920-baseline\r\ntags: [analysis, ml]\r\nseed: 18446744073709551617\r\npayload: !!binary SGVsbG8=\r\n---\r\n"), body...)
+	data := append([]byte("---\r\nid: 20260924-example\r\ntitle: 'Example: a study'\r\ncreated_at: 2026-09-24T12:00:00Z\r\nbased_on:\r\n  - 20260920-baseline\r\ntags: [analysis, ml]\r\nseed: 18446744073709551617\r\npayload: !!binary SGVsbG8=\r\n---\r\n"), body...)
 	record, err := Parse(data)
 	if err != nil {
 		t.Fatal(err)
@@ -41,39 +43,44 @@ func TestRecordRoundTrip(t *testing.T) {
 }
 
 func TestParseRejectsMalformedRecords(t *testing.T) {
-	for name, data := range map[string]string{
-		"no header":       "# Hello\n",
-		"unclosed header": "---\nid: example\ntitle: Example\n",
-		"empty header":    "---\n---\n",
-		"not a mapping":   "---\n- example\n---\n",
-		"invalid YAML":    "---\nid: [\n---\n",
-		"missing title":   "---\nid: example\n---\n",
-		"empty id":        "---\nid: ' '\ntitle: Example\n---\n",
-		"numeric id":      "---\nid: 42\ntitle: Example\n---\n",
-		"numeric title":   "---\nid: example\ntitle: 42\n---\n",
-		"scalar parents":  "---\nid: example\ntitle: Example\nbased_on: previous\n---\n",
-		"numeric parent":  "---\nid: example\ntitle: Example\nbased_on: [42]\n---\n",
-		"empty parent":    "---\nid: example\ntitle: Example\nbased_on: ['']\n---\n",
-		"duplicate key":   "---\nid: one\nid: two\ntitle: Example\n---\n",
-		"null key":        "---\nid: example\ntitle: Example\nnull: keep-me\n---\n",
-		"numeric key":     "---\nid: example\ntitle: Example\n42: keep-me\n---\n",
-		"binary key":      "---\nid: example\ntitle: Example\n!!binary eA==: first\nx: second\n---\n",
-		"trailing YAML":   "---\nid: example\ntitle: Example\n...\nlost: value\n---\n",
-		"alias":           "---\nid: &id example\ntitle: Example\ncustom: *id\n---\n",
-		"merge":           "---\n<<: {id: example, title: Example}\n---\n",
+	for name, tt := range map[string]struct {
+		data string
+		want string
+	}{
+		"no header":       {"# Hello\n", "README must begin"},
+		"unclosed header": {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n", "missing its closing"},
+		"empty header":    {"---\n---\n", "parse metadata"},
+		"not a mapping":   {"---\n- example\n---\n", "YAML mapping"},
+		"invalid YAML":    {"---\nid: [\n---\n", "parse metadata"},
+		"missing id":      {"---\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "id is required"},
+		"missing title":   {"---\nid: example\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "title is required"},
+		"empty id":        {"---\nid: ' '\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "id is required"},
+		"empty title":     {"---\nid: example\ntitle: ' '\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "title is required"},
+		"numeric id":      {"---\nid: 42\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "id must be a string"},
+		"numeric title":   {"---\nid: example\ntitle: 42\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "title must be a string"},
+		"scalar parents":  {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: previous\n---\n", "based_on"},
+		"numeric parent":  {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [42]\n---\n", "based_on"},
+		"empty parent":    {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: ['']\n---\n", "based_on"},
+		"duplicate key":   {"---\nid: one\nid: two\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n---\n", "already defined"},
+		"null key":        {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\nnull: keep-me\n---\n", "metadata keys must be strings"},
+		"numeric key":     {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n42: keep-me\n---\n", "metadata keys must be strings"},
+		"binary key":      {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n!!binary eA==: first\nx: second\n---\n", "metadata keys must be strings"},
+		"trailing YAML":   {"---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\n...\nlost: value\n---\n", "exactly one YAML document"},
+		"alias":           {"---\nid: &id example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: *id\n---\n", "YAML aliases and merge keys are unsupported"},
+		"merge":           {"---\ncreated_at: 2026-09-24T12:00:00Z\n<<: {id: example, title: Example}\n---\n", "YAML aliases and merge keys are unsupported"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := Parse([]byte(data)); err == nil {
-				t.Fatal("malformed record accepted")
+			if _, err := Parse([]byte(tt.data)); err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
 			}
 		})
 	}
 }
 
 func TestMarshalRejectsReservedExtraFields(t *testing.T) {
-	r := Record{ID: "example", Title: "Example", Extra: map[string]yaml.Node{"id": {Kind: yaml.ScalarNode, Tag: "!!str", Value: "other"}}}
-	if _, err := r.Marshal(); err == nil {
-		t.Fatal("conflicting metadata accepted")
+	r := Record{ID: "example", Title: "Example", CreatedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC), Extra: map[string]yaml.Node{"id": {Kind: yaml.ScalarNode, Tag: "!!str", Value: "other"}}}
+	if _, err := r.Marshal(); err == nil || !strings.Contains(err.Error(), "extra metadata cannot override id") {
+		t.Fatalf("error = %v, want reserved id error", err)
 	}
 }
 

@@ -46,7 +46,7 @@ func TestListFromNestedDirectory(t *testing.T) {
 func TestListNormalizesWhitespace(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	writeListRecord(t, root, "20260924-record", experiment.Record{ID: "20260924-record", Title: "Messy\t title\ncontinued"})
+	writeListRecord(t, root, "20260924-record", experiment.Record{ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"list"}, root, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
@@ -97,13 +97,13 @@ func TestListInvalidReadme(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
-			writeListRecord(t, root, "20260924-valid", experiment.Record{ID: "20260924-valid", Title: "Valid"})
+			writeListRecord(t, root, "20260924-valid", experiment.Record{ID: "20260924-valid", Title: "Valid", CreatedAt: metadataTestTime()})
 			dir := filepath.Join(root, "experiments", "z-invalid")
 			if err := os.Mkdir(dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
 			if malformed {
-				if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("---\nid: [invalid]\ntitle: Invalid\n---\n"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("---\nid: [invalid]\ntitle: Invalid\ncreated_at: 2026-09-24T12:00:00Z\n---\n"), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -122,10 +122,10 @@ func TestListInvalidReadme(t *testing.T) {
 func TestListRejectsMismatchedID(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	writeListRecord(t, root, "20260922-valid", experiment.Record{ID: "20260922-valid", Title: "Valid"})
+	writeListRecord(t, root, "20260922-valid", experiment.Record{ID: "20260922-valid", Title: "Valid", CreatedAt: metadataTestTime()})
 	const folder = "20260924-renamed"
 	const id = "20260924-original"
-	writeListRecord(t, root, folder, experiment.Record{ID: id, Title: "Renamed experiment"})
+	writeListRecord(t, root, folder, experiment.Record{ID: id, Title: "Renamed experiment", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
 	err := cli.Run([]string{"list"}, root, time.Time{}, &stdout)
 	if err == nil {
@@ -194,11 +194,5 @@ func writeListRecord(t *testing.T, root, name string, record experiment.Record) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(root, "experiments", name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeREADME(t, root, name, data)
 }
