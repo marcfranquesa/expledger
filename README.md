@@ -51,6 +51,15 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
+Open a shell in a temporary fixture project to try the installed CLI:
+
+```sh
+./scripts/playground.sh
+```
+
+Run `expledger list` or other commands there; `exit` returns to your previous shell.
+The project stays in `/tmp` until you remove it. Its remote links are placeholders.
+
 Preview the fixture experiments (remote links are placeholders):
 
 ```sh
