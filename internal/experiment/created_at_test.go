@@ -2,40 +2,12 @@ package experiment
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"go.yaml.in/yaml/v3"
 )
-
-func TestCreateRecordsUTCTimestampWithLocalDate(t *testing.T) {
-	root := t.TempDir()
-	now := time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("local", -4*60*60))
-	dir, err := Create(root, "timestamp", now, CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := filepath.Join(root, "experiments", "20260924-timestamp"); dir != want {
-		t.Fatalf("directory = %q, want %q", dir, want)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	record, err := Parse(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if record.ID != "20260924-timestamp" || !record.CreatedAt.Equal(now) {
-		t.Fatalf("creation metadata = %s, %s; want local date ID and %s", record.ID, record.CreatedAt, now)
-	}
-	if !bytes.Contains(data, []byte("created_at: 2026-09-25T03:59:00.123456789Z\n")) {
-		t.Fatalf("README does not contain precise UTC timestamp: %s", data)
-	}
-}
 
 func TestCreatedAtRoundTrip(t *testing.T) {
 	body := []byte("\r\n# Notes\r\n\r\nKeep this exactly.  \n")

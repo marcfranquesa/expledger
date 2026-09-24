@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/cli"
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
@@ -266,7 +267,7 @@ func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
 func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	dir, err := experiment.Create(root, "my-idea", metadataTestTime(), experiment.CreateOptions{})
+	dir, err := catalog.Create(root, "my-idea", metadataTestTime(), catalog.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,10 +294,7 @@ func TestNewDoesNotValidateAncestors(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
 	const parent = "20260920-baseline"
-	now := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
-	if _, err := experiment.Create(root, "baseline", now, experiment.CreateOptions{BasedOn: []string{"20260919-missing"}}); err != nil {
-		t.Fatal(err)
-	}
+	writeREADME(t, root, parent, []byte("---\nid: "+parent+"\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\nbased_on: [20260919-missing]\n---\n"))
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatalf("valid direct parent was rejected: %v", err)
@@ -345,7 +343,7 @@ func metadataTestTime() time.Time {
 func createMetadataParent(t *testing.T, root, slug string, day int) {
 	t.Helper()
 	now := time.Date(2026, time.September, day, 12, 0, 0, 0, time.UTC)
-	if _, err := experiment.Create(root, slug, now, experiment.CreateOptions{}); err != nil {
+	if _, err := catalog.Create(root, slug, now, catalog.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }

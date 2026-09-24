@@ -1,4 +1,4 @@
-// Package catalog discovers and locates experiments in a project.
+// Package catalog creates and reads experiment directories in a project.
 package catalog
 
 import (
