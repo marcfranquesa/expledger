@@ -51,13 +51,13 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
-Set up a temporary fixture project and enter it to try the installed CLI:
+Open a shell in a temporary fixture project to try the installed CLI:
 
 ```sh
-cd "$(./scripts/setup-test-project.sh)"
-expledger list
+./scripts/setup-test-project.sh
 ```
 
+Run `expledger list` or other commands there; `exit` returns to your previous shell.
 The project stays in `/tmp` until you remove it. Its remote links are placeholders.
 
 Preview the fixture experiments (remote links are placeholders):
