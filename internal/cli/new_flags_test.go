@@ -82,6 +82,9 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 			if err := cli.Run(context.Background(), args, root, metadataTestTime(), &stdout); err == nil {
 				t.Fatalf("expected an error for %q", args)
 			}
+			if stdout.Len() != 0 {
+				t.Fatalf("invalid metadata printed output: %q", stdout.String())
+			}
 			entries, err := os.ReadDir(root)
 			if err != nil {
 				t.Fatal(err)
@@ -118,155 +121,6 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	}
 }
 
-func TestNewRejectsMissingParent(t *testing.T) {
-	for _, withExistingParent := range []bool{false, true} {
-		name := "only parent missing"
-		if withExistingParent {
-			name = "second parent missing"
-		}
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			git(t, root, "init", "--quiet")
-			const parent = "20260920-missing"
-			args := []string{"new", "my-idea"}
-			if withExistingParent {
-				createMetadataParent(t, root, "baseline", 20)
-				args = append(args, "--based-on", "20260920-baseline")
-			}
-			args = append(args, "--based-on", parent)
-			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), args, root, metadataTestTime(), &stdout)
-			if err == nil || !strings.Contains(err.Error(), parent) {
-				t.Fatalf("expected error naming missing parent %q, got %v", parent, err)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("failed command printed output: %q", stdout.String())
-			}
-			checkDir, wantEntry := root, ".git"
-			if withExistingParent {
-				checkDir = filepath.Join(root, "experiments")
-				wantEntry = "20260920-baseline"
-			}
-			entries, err := os.ReadDir(checkDir)
-			if err != nil || len(entries) != 1 || entries[0].Name() != wantEntry {
-				t.Fatalf("missing parent unexpectedly created files: entries=%v, err=%v", entries, err)
-			}
-		})
-	}
-}
-
-func TestNewRejectsInvalidParentRecord(t *testing.T) {
-	const parent = "20260920-baseline"
-	for _, tt := range []struct {
-		name     string
-		folder   string
-		metadata string
-	}{
-		{name: "missing metadata"},
-		{name: "malformed metadata", metadata: "schema: expledger/v1\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
-		{name: "mismatched ID", metadata: "schema: expledger/v1\nid: 20260920-other\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
-		{name: "case mismatched folder", folder: "20260920-Baseline", metadata: "schema: expledger/v1\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
-			git(t, root, "init", "--quiet")
-			folder := tt.folder
-			if folder == "" {
-				folder = parent
-			}
-			dir := filepath.Join(root, "experiments", folder)
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			metadata := filepath.Join(dir, "expledger.yaml")
-			if tt.metadata != "" {
-				if err := os.WriteFile(metadata, []byte(tt.metadata), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			notes := []byte("Existing parent notes.\n")
-			notesPath := filepath.Join(dir, "notes.md")
-			if err := os.WriteFile(notesPath, notes, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", parent, "expledger.yaml")) {
-				t.Fatalf("expected error naming invalid parent metadata, got %v", err)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("failed command printed output: %q", stdout.String())
-			}
-			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
-			if err != nil || len(entries) != 1 || entries[0].Name() != folder {
-				t.Fatalf("invalid parent unexpectedly created files: entries=%v, err=%v", entries, err)
-			}
-			data, err := os.ReadFile(notesPath)
-			if err != nil || !bytes.Equal(data, notes) {
-				t.Fatalf("invalid parent changed existing notes: data=%q, err=%v", data, err)
-			}
-			data, err = os.ReadFile(metadata)
-			if tt.metadata == "" {
-				if !os.IsNotExist(err) {
-					t.Fatalf("missing parent metadata unexpectedly created: err=%v", err)
-				}
-			} else if err != nil || string(data) != tt.metadata {
-				t.Fatalf("invalid parent changed existing metadata: data=%q, err=%v", data, err)
-			}
-		})
-	}
-}
-
-func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
-	const parent = "20260920-baseline"
-	for _, tt := range []struct {
-		name     string
-		metadata string
-	}{
-		{name: "missing metadata"},
-		{name: "malformed metadata", metadata: "schema: expledger/v1\nid: [invalid]\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n"},
-		{name: "mismatched ID", metadata: "schema: expledger/v1\nid: 20260921-other\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
-			git(t, root, "init", "--quiet")
-			createMetadataParent(t, root, "baseline", 20)
-			createMetadataParent(t, root, "unrelated", 21)
-			metadata := filepath.Join(root, "experiments", "20260921-unrelated", "expledger.yaml")
-			var err error
-			if tt.metadata == "" {
-				err = os.Remove(metadata)
-			} else {
-				err = os.WriteFile(metadata, []byte(tt.metadata), 0o644)
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
-				t.Fatalf("valid parent rejected because of unrelated experiment: %v", err)
-			}
-			if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
-				t.Fatalf("based_on = %v, want [%s]", got, parent)
-			}
-			if err := cli.Run(context.Background(), []string{"new", "independent"}, root, metadataTestTime(), &stdout); err != nil {
-				t.Fatalf("independent creation rejected invalid catalog: %v", err)
-			}
-			if record := readNewRecord(t, root, "independent"); len(record.BasedOn) != 0 {
-				t.Fatalf("independent record has parents: %v", record.BasedOn)
-			}
-			data, err := os.ReadFile(metadata)
-			if tt.metadata == "" {
-				if !os.IsNotExist(err) {
-					t.Fatalf("creation changed missing unrelated metadata: err=%v", err)
-				}
-			} else if err != nil || string(data) != tt.metadata {
-				t.Fatalf("creation changed unrelated metadata: data=%q, err=%v", data, err)
-			}
-		})
-	}
-}
-
 func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
@@ -290,20 +144,6 @@ func TestNewRejectsExistingExperiment(t *testing.T) {
 	data, err := os.ReadFile(readme)
 	if err != nil || !bytes.Equal(data, notes) {
 		t.Fatalf("duplicate changed existing notes: data=%q, err=%v", data, err)
-	}
-}
-
-func TestNewDoesNotValidateAncestors(t *testing.T) {
-	root := t.TempDir()
-	git(t, root, "init", "--quiet")
-	const parent = "20260920-baseline"
-	writeMetadata(t, root, parent, []byte("schema: expledger/v1\nid: "+parent+"\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\nbased_on: [20260919-missing]\n"))
-	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
-		t.Fatalf("valid direct parent was rejected: %v", err)
-	}
-	if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
-		t.Fatalf("based_on = %v, want [%s]", got, parent)
 	}
 }
 

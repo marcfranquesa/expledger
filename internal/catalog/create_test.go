@@ -265,6 +265,7 @@ func TestCreateRejectsInvalidParentRecord(t *testing.T) {
 	}{
 		{name: "missing metadata", folder: "baseline"},
 		{name: "malformed metadata", folder: "baseline", metadata: "schema: expledger/v1\nid: [\n"},
+		{name: "invalid metadata fields", folder: "baseline", metadata: "schema: expledger/v1\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n"},
 		{name: "mismatched ID", folder: "baseline", metadata: "schema: expledger/v1\nid: other\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n"},
 		{name: "case mismatched folder", folder: "Baseline", metadata: "schema: expledger/v1\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n"},
 	} {
@@ -272,17 +273,24 @@ func TestCreateRejectsInvalidParentRecord(t *testing.T) {
 			root := t.TempDir()
 			writeMetadata(t, root, tt.folder, tt.metadata)
 			metadata := filepath.Join(root, "experiments", tt.folder, "expledger.yaml")
+			notes := filepath.Join(filepath.Dir(metadata), "notes.md")
+			if err := os.WriteFile(notes, []byte("Existing parent notes.\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
 			if tt.metadata == "" {
 				if err := os.Remove(metadata); err != nil {
 					t.Fatal(err)
 				}
 			}
-			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"baseline"}}); dir != "" || err == nil || !strings.Contains(err.Error(), `check parent experiment "baseline"`) {
+			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"baseline"}}); dir != "" || err == nil || !strings.Contains(err.Error(), `check parent experiment "baseline"`) || !strings.Contains(err.Error(), filepath.Join("experiments", "baseline", "expledger.yaml")) {
 				t.Fatalf("Create = %q, %v; want invalid parent error", dir, err)
 			}
 			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
 			if err != nil || len(entries) != 1 || entries[0].Name() != tt.folder {
 				t.Fatalf("invalid parent changed project: entries=%v, err=%v", entries, err)
+			}
+			if data, err := os.ReadFile(notes); err != nil || string(data) != "Existing parent notes.\n" {
+				t.Fatalf("invalid parent changed existing notes: data=%q, err=%v", data, err)
 			}
 			data, err := os.ReadFile(metadata)
 			if tt.metadata == "" {
@@ -298,23 +306,39 @@ func TestCreateRejectsInvalidParentRecord(t *testing.T) {
 
 func TestCreateChecksOnlyDirectParents(t *testing.T) {
 	for _, parents := range [][]string{nil, {"baseline"}} {
-		t.Run(fmt.Sprint(parents), func(t *testing.T) {
-			root := t.TempDir()
-			writeMetadata(t, root, "baseline", "schema: expledger/v1\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [missing-ancestor]\n")
-			writeMetadata(t, root, "unrelated", "not valid metadata\n")
-			dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: parents})
-			if err != nil {
-				t.Fatal(err)
-			}
-			record, err := Read(root, filepath.Base(dir))
-			if err != nil || !reflect.DeepEqual(record.BasedOn, parents) {
-				t.Fatalf("created record = %+v, %v; want parents %v", record, err, parents)
-			}
-			data, err := os.ReadFile(filepath.Join(root, "experiments", "unrelated", "expledger.yaml"))
-			if err != nil || string(data) != "not valid metadata\n" {
-				t.Fatalf("creation changed unrelated metadata: data=%q, err=%v", data, err)
-			}
-		})
+		for name, content := range map[string]string{
+			"missing metadata":   "",
+			"malformed metadata": "not valid metadata\n",
+			"mismatched ID":      "schema: expledger/v1\nid: other\ntitle: Unrelated\ncreated_at: 2026-09-24T12:00:00Z\n",
+		} {
+			t.Run(fmt.Sprint(parents)+"/"+name, func(t *testing.T) {
+				root := t.TempDir()
+				writeMetadata(t, root, "baseline", "schema: expledger/v1\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [missing-ancestor]\n")
+				writeMetadata(t, root, "unrelated", content)
+				metadata := filepath.Join(root, "experiments", "unrelated", "expledger.yaml")
+				if content == "" {
+					if err := os.Remove(metadata); err != nil {
+						t.Fatal(err)
+					}
+				}
+				dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: parents})
+				if err != nil {
+					t.Fatal(err)
+				}
+				record, err := Read(root, filepath.Base(dir))
+				if err != nil || !reflect.DeepEqual(record.BasedOn, parents) {
+					t.Fatalf("created record = %+v, %v; want parents %v", record, err, parents)
+				}
+				data, err := os.ReadFile(metadata)
+				if content == "" {
+					if !errors.Is(err, os.ErrNotExist) {
+						t.Fatalf("creation changed missing unrelated metadata: err=%v", err)
+					}
+				} else if err != nil || string(data) != content {
+					t.Fatalf("creation changed unrelated metadata: data=%q, err=%v", data, err)
+				}
+			})
+		}
 	}
 }
 
