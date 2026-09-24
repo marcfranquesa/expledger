@@ -17,6 +17,7 @@ Make sure Go's binary installation directory is on your `PATH`.
 | Name | Description |
 | --- | --- |
 | `expledger new <slug> [flags]` | Create a dated experiment folder and README at the Git working tree root. Use `--title` for a custom title and repeat `--based-on` for parent experiment IDs. |
+| `expledger list` | List experiment IDs and titles in descending ID order. |
 | `expledger help [command]` | Show general or command-specific help. Also available with `--help` or `-h`, such as `expledger new --help`. |
 
 ## Usage
@@ -55,7 +56,13 @@ based_on:
 
 `created_at` records creation time as an RFC3339 timestamp in UTC, preserving fractional seconds. Older records may omit it; their creation time remains unknown and is not filled in when read or re-encoded. The date in the experiment ID still uses local time.
 
-`based_on` describes experiment ancestry. References are stored but are not yet resolved or checked for cycles. Independent experiments omit this field. There is no status field.
+`based_on` describes experiment ancestry. Parent experiment directories passed with `--based-on` must already exist in the working tree. References are not checked for cycles. Independent experiments omit this field. There is no status field.
+
+```sh
+expledger list
+```
+
+This reads the README in each experiment directory and prints an ID/title table. A missing or empty `experiments/` directory reports "No experiments found." Missing or malformed experiment READMEs report an error with the file path. Files and symlinked directories directly under `experiments/` are ignored; experiment artifacts are not scanned recursively.
 
 ## Agent skill
 
@@ -84,6 +91,6 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
-The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree and resolves the Git root in a shared pre-run hook, `help.go` holds help text, and `new.go` handles experiment creation using the resolved path. `internal/experiment` handles directory creation and README encoding and parsing. Tests live beside the code they exercise.
+The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree and resolves the Git root in a shared pre-run hook, `help.go` holds help text, and `new.go` and `list.go` handle their commands. `internal/experiment` handles experiment creation, discovery, and README encoding and parsing. Tests live beside the code they exercise.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

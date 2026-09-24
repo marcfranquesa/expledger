@@ -20,7 +20,7 @@ type CreateOptions struct {
 }
 
 // Create adds an experiment under root, using the date in now's location.
-// An existing experiment directory is never overwritten.
+// Parent experiment directories must exist. Existing directories are never overwritten.
 func Create(root, slug string, now time.Time, opts CreateOptions) (string, error) {
 	if !slugPattern.MatchString(slug) {
 		return "", fmt.Errorf("invalid slug %q: use lowercase letters, digits, and single hyphens", slug)
@@ -40,6 +40,22 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	data, err := record.Marshal()
 	if err != nil {
 		return "", err
+	}
+	exists, err := Exists(root, id)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return "", fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
+	}
+	for _, parent := range opts.BasedOn {
+		exists, err := Exists(root, parent)
+		if err != nil {
+			return "", fmt.Errorf("check parent experiment %q: %w", parent, err)
+		}
+		if !exists {
+			return "", fmt.Errorf("parent experiment %q does not exist", parent)
+		}
 	}
 
 	fs, err := os.OpenRoot(root)

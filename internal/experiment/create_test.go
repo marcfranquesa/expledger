@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -75,5 +77,62 @@ func TestCreateRejectsSymlink(t *testing.T) {
 	entries, err := os.ReadDir(outside)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("wrote through symlink: entries=%v, err=%v", entries, err)
+	}
+}
+
+func TestCreateWithExistingParents(t *testing.T) {
+	root := t.TempDir()
+	parents := []string{"baseline", "reference"}
+	for _, parent := range parents {
+		if err := os.MkdirAll(filepath.Join(root, "experiments", parent), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(record.BasedOn, parents) {
+		t.Fatalf("based_on = %v, want %v", record.BasedOn, parents)
+	}
+}
+
+func TestCreateRejectsMissingParentsBeforeWriting(t *testing.T) {
+	for _, withExistingParent := range []bool{false, true} {
+		name := "missing only parent"
+		if withExistingParent {
+			name = "missing second parent"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			parents := []string{"missing-parent"}
+			if withExistingParent {
+				if err := os.MkdirAll(filepath.Join(root, "experiments", "baseline"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				parents = []string{"baseline", "missing-parent"}
+			}
+			if _, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents}); err == nil || !strings.Contains(err.Error(), `parent experiment "missing-parent" does not exist`) {
+				t.Fatalf("error = %v, want missing parent ID", err)
+			}
+			checkDir := root
+			wantEntries := 0
+			if withExistingParent {
+				checkDir = filepath.Join(root, "experiments")
+				wantEntries = 1
+			}
+			entries, err := os.ReadDir(checkDir)
+			if err != nil || len(entries) != wantEntries {
+				t.Fatalf("invalid parent changed project: entries=%v, err=%v", entries, err)
+			}
+		})
 	}
 }
