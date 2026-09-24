@@ -54,6 +54,32 @@ based_on:
 
 `based_on` describes experiment ancestry. References are stored but are not yet resolved or checked for cycles. Independent experiments omit this field. There is no status field.
 
+## Agent skill
+
+The [ExpLedger skill](skills/expledger/SKILL.md) tells coding agents to use
+ExpLedger whenever they run coding experiments: create a record before running,
+link parent experiments, and document the method, results, and conclusions.
+
+Install the CLI above first. To set up the skill for a project in Codex, run this
+from your ExpLedger checkout, replacing `/path/to/project` with the target
+repository:
+
+```sh
+mkdir -p "/path/to/project/.agents/skills/expledger"
+cp skills/expledger/SKILL.md "/path/to/project/.agents/skills/expledger/SKILL.md"
+```
+
+This copies the skill into Codex's [repository skill directory](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
+You can invoke it explicitly with `$expledger`. To make its use a repository
+convention, add this to the target project's `AGENTS.md`:
+
+```markdown
+Use the expledger skill whenever running coding experiments.
+```
+
+For other agents that support `SKILL.md`, copy the skill into their documented
+skill directory and add the same convention to their project instructions.
+
 ## Development
 
 ```sh
