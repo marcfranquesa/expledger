@@ -35,24 +35,6 @@ ExpLedger is in active development. Expect breaking changes.
 `build` and `serve` work in local-only repositories and detached worktrees.
 Remote links appear when `origin` points to GitHub and a branch is checked out.
 
-## Run an experiment
-
-Create a record, then replace its generated `run.sh` stub with the experiment's
-commands. Keep parameters in `run.sh` or files beside it; `run` accepts no
-workload arguments.
-
-```sh
-expledger new baseline --title "Baseline model"
-# Edit experiments/<id>/run.sh and its supporting files.
-expledger run <id>
-```
-
-Prepare the project checkout and environment you want to use before running.
-The script runs from its existing experiment folder, inherits your environment,
-and writes results wherever it chooses. `last_run` records the current Git `HEAD`
-and whether Git sees project changes outside `experiments/`; it does not control
-future runs.
-
 ## Installation
 
 Requires Go 1.26+ and Git.
