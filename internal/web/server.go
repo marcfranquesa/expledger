@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
@@ -31,6 +30,7 @@ type page struct {
 // NewHandler reads the catalog on each request. GitHub links use the repository
 // and branch selected when the server starts.
 func NewHandler(root, repositoryURL, branch string) http.Handler {
+	remoteURL := repositoryURL + "/tree/" + url.PathEscape(branch) + "/experiments/"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if r.URL.Path != "/" {
@@ -54,7 +54,7 @@ func NewHandler(root, repositoryURL, branch string) http.Handler {
 				ID: record.ID, Title: record.Title,
 				CreatedAt: created.Format("Jan 02, 2006 · 15:04:05 UTC"),
 				DateTime:  created.Format(time.RFC3339Nano),
-				GitHubURL: folderURL(repositoryURL, branch, filepath.Join("experiments", record.ID)),
+				GitHubURL: remoteURL + url.PathEscape(record.ID),
 			})
 		}
 		var body bytes.Buffer
@@ -67,12 +67,4 @@ func NewHandler(root, repositoryURL, branch string) http.Handler {
 			_, _ = w.Write(body.Bytes())
 		}
 	})
-}
-
-func folderURL(repositoryURL, branch, folder string) string {
-	parts := strings.Split(filepath.ToSlash(folder), "/")
-	for i, part := range parts {
-		parts[i] = url.PathEscape(part)
-	}
-	return strings.TrimSuffix(repositoryURL, "/") + "/tree/" + url.PathEscape(branch) + "/" + strings.Join(parts, "/")
 }
