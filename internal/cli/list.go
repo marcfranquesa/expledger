@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"text/tabwriter"
+	"unicode"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/spf13/cobra"
@@ -29,7 +31,7 @@ func listExperimentsCommand(app *application) *cobra.Command {
 				return err
 			}
 			for _, record := range records {
-				id := strings.Join(strings.Fields(record.ID), " ")
+				id := displayID(record.ID)
 				title := strings.Join(strings.Fields(record.Title), " ")
 				if _, err := fmt.Fprintf(out, "%s\t%s\n", id, title); err != nil {
 					return err
@@ -38,4 +40,13 @@ func listExperimentsCommand(app *application) *cobra.Command {
 			return out.Flush()
 		},
 	}
+}
+
+func displayID(id string) string {
+	for _, r := range id {
+		if unicode.IsSpace(r) || !strconv.IsPrint(r) || r == '"' || r == '\\' {
+			return strconv.Quote(id)
+		}
+	}
+	return id
 }

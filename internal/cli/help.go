@@ -20,6 +20,8 @@ const listDescription = "List experiment IDs and titles"
 const listDetails = `Read experiments/*/expledger.yaml at the Git working tree root.
 Display IDs and titles by created_at, newest first.
 Each YAML id must exactly match its experiment folder name.
+IDs containing whitespace, quotes, or non-printable characters are double-quoted,
+using Go-style escapes such as \t and \n.
 Ignore directories without expledger.yaml. Report invalid metadata with its path.`
 
 const validateDescription = "Validate experiment metadata"
