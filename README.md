@@ -94,7 +94,7 @@ go run ./cmd/expledger --help
 The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
 
 - `internal/cli`: command arguments, orchestration, and terminal output.
-- `internal/catalog`: discovery and validation (`List`), lookup of loaded records (`Lookup`), and directory-existence checks (`Exists`) for overwrite protection.
-- `internal/experiment`: individual records, IDs, creation, and YAML parsing.
+- `internal/catalog`: discovery and validation (`List`), and lookup of loaded records (`Lookup`).
+- `internal/experiment`: individual records, creation with ID generation and atomic overwrite protection, and YAML parsing.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

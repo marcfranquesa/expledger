@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
@@ -27,17 +26,6 @@ func newExperimentCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := experiment.NewID(args[0], app.now)
-			if err != nil {
-				return err
-			}
-			exists, err := catalog.Exists(app.repoRoot, id)
-			if err != nil {
-				return err
-			}
-			if exists {
-				return fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
-			}
 			if len(opts.BasedOn) > 0 {
 				records, err := catalog.List(app.repoRoot)
 				if err != nil {
