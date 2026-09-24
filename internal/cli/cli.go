@@ -2,8 +2,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -45,9 +47,21 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 func gitRoot(cwd string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	cmd.Dir = cwd
+	// Keep the diagnostic used below stable across the user's locale.
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("find Git working tree (run inside a repository): %w", err)
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			detail := strings.TrimSpace(string(exitErr.Stderr))
+			if strings.HasPrefix(detail, "fatal: not a git repository (or any") {
+				return "", fmt.Errorf("no Git repository found in %q or its parent directories\nRun expledger from an existing Git repository, or run 'git init' in your project directory first.", cwd)
+			}
+			if detail != "" {
+				return "", fmt.Errorf("find Git working tree: %s: %w", detail, err)
+			}
+		}
+		return "", fmt.Errorf("find Git working tree: %w", err)
 	}
 	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), nil
 }
