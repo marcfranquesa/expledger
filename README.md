@@ -41,16 +41,19 @@ expledger new --help
 
 Running `expledger` without arguments shows help. Help works outside a Git repository. Experiment commands resolve the Git working tree root before running and report an error outside a repository.
 
-The README contains YAML `id` and `title` fields, followed by Markdown sections for the hypothesis, method, and finding. The ID stays fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
+The README contains YAML `id`, `title`, and `created_at` fields, followed by Markdown sections for the hypothesis, method, and finding. The ID and creation time stay fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
 
 ```yaml
 ---
 id: 20260924-my-idea
 title: My idea
+created_at: 2026-09-24T14:30:00.123456789Z
 based_on:
   - 20260920-baseline
 ---
 ```
+
+`created_at` records creation time as an RFC3339 timestamp in UTC, preserving fractional seconds. Older records may omit it; their creation time remains unknown and is not filled in when read or re-encoded. The date in the experiment ID still uses local time.
 
 `based_on` describes experiment ancestry. References are stored but are not yet resolved or checked for cycles. Independent experiments omit this field. There is no status field.
 

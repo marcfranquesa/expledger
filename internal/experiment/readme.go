@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -13,11 +14,12 @@ import (
 // Record holds structured metadata and the unchanged Markdown body.
 // Extra retains metadata fields added by people or later versions of ExpLedger.
 type Record struct {
-	ID      string               `yaml:"id"`
-	Title   string               `yaml:"title"`
-	BasedOn []string             `yaml:"based_on,omitempty"`
-	Extra   map[string]yaml.Node `yaml:",inline"`
-	Body    []byte               `yaml:"-"`
+	ID        string               `yaml:"id"`
+	Title     string               `yaml:"title"`
+	CreatedAt time.Time            `yaml:"created_at,omitempty"`
+	BasedOn   []string             `yaml:"based_on,omitempty"`
+	Extra     map[string]yaml.Node `yaml:",inline"`
+	Body      []byte               `yaml:"-"`
 }
 
 // Parse reads YAML front matter delimited by --- lines, followed by Markdown.
@@ -51,6 +53,13 @@ func Parse(data []byte) (Record, error) {
 		case "id", "title":
 			if value.Tag != "!!str" {
 				return Record{}, fmt.Errorf("%s must be a string", key)
+			}
+		case "created_at":
+			if value.Kind != yaml.ScalarNode || (value.Tag != "!!str" && value.Tag != "!!timestamp") {
+				return Record{}, errors.New("created_at must be an RFC3339 timestamp with a timezone")
+			}
+			if _, err := time.Parse(time.RFC3339Nano, value.Value); err != nil {
+				return Record{}, fmt.Errorf("invalid created_at: %w", err)
 			}
 		case "based_on":
 			if value.Kind != yaml.SequenceNode {
@@ -98,7 +107,7 @@ func (r Record) validate() error {
 			return errors.New("based_on entries must be nonempty strings")
 		}
 	}
-	for _, key := range []string{"id", "title", "based_on"} {
+	for _, key := range []string{"id", "title", "created_at", "based_on"} {
 		if _, exists := r.Extra[key]; exists {
 			return fmt.Errorf("extra metadata cannot override %s", key)
 		}
