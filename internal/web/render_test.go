@@ -49,3 +49,24 @@ func TestRenderInMemory(t *testing.T) {
 		t.Fatal("renderer changed the supplied record order")
 	}
 }
+
+func TestRenderWithoutRemoteLinks(t *testing.T) {
+	records := []experiment.Record{{ID: "local", Title: "Local experiment", CreatedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)}}
+	for _, options := range []web.PageOptions{
+		{Project: "Local", Branch: "main"},
+		{Project: "Detached", RepositoryURL: "https://github.com/owner/repo"},
+		{Project: "Local"},
+	} {
+		body, err := web.Render(records, options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := string(body)
+		if !strings.Contains(page, "Local experiment") || strings.Contains(page, `class="github"`) || strings.Contains(page, "href=") {
+			t.Fatalf("local catalog contains missing content or remote links: %s", page)
+		}
+		if options.Branch == "" && strings.Contains(page, `class="branch"`) {
+			t.Fatal("detached catalog contains an empty branch badge")
+		}
+	}
+}

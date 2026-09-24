@@ -16,6 +16,9 @@ filesystem rules for hand-written records and integrations.
 | `expledger serve [--port <port>]` | Browse experiments locally with links to their GitHub folders. |
 | `expledger help [command]` | Show help and available flags. |
 
+`build` and `serve` work in local-only repositories and detached worktrees.
+Remote links appear when `origin` points to GitHub and a branch is checked out.
+
 ## Installation
 
 Requires Go 1.26+ and Git.

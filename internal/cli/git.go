@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -37,20 +38,27 @@ func gitOutput(cwd string, args ...string) (string, error) {
 }
 
 func githubLocation(root string) (repositoryURL, branch string, err error) {
-	remote, err := gitOutput(root, "remote", "get-url", "origin")
-	if err != nil {
-		return "", "", fmt.Errorf("GitHub links require an origin remote pointing to GitHub: %w", err)
-	}
-	repositoryURL, err = githubRepositoryURL(remote)
-	if err != nil {
-		return "", "", err
-	}
 	branch, err = gitOutput(root, "branch", "--show-current")
 	if err != nil {
 		return "", "", fmt.Errorf("read current Git branch: %w", err)
 	}
 	if branch == "" {
-		return "", "", errors.New("GitHub links require a checked-out branch; switch to a branch and try again")
+		return "", "", nil
+	}
+	remotes, err := gitOutput(root, "remote")
+	if err != nil {
+		return "", "", fmt.Errorf("read Git remotes: %w", err)
+	}
+	if !slices.Contains(strings.Split(remotes, "\n"), "origin") {
+		return "", branch, nil
+	}
+	remote, err := gitOutput(root, "remote", "get-url", "origin")
+	if err != nil {
+		return "", "", fmt.Errorf("read origin remote: %w", err)
+	}
+	repositoryURL, err = githubRepositoryURL(remote)
+	if err != nil {
+		return "", branch, nil
 	}
 	return repositoryURL, branch, nil
 }

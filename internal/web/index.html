@@ -38,7 +38,7 @@
     <header>
       <p class="brand">ExpLedger</p>
       <h1>Experiments</h1>
-      <div class="context"><span>{{.Project}}</span><code class="branch">{{.Branch}}</code></div>
+      <div class="context"><span>{{.Project}}</span>{{if .Branch}}<code class="branch">{{.Branch}}</code>{{end}}</div>
     </header>
     <p class="section-heading">Newest first</p>
     {{if .Experiments}}
@@ -50,7 +50,7 @@
           <code class="id">{{.ID}}</code>
           <time datetime="{{.DateTime}}">{{.CreatedAt}}</time>
         </div>
-        <a class="github" href="{{.GitHubURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>
+        {{if .GitHubURL}}<a class="github" href="{{.GitHubURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}
       </li>
       {{end}}
     </ol>
