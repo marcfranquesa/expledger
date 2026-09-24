@@ -26,7 +26,7 @@ type page struct {
 	Experiments     []experimentView
 }
 
-// PageOptions supplies display metadata and the normalized GitHub repository URL.
+// PageOptions supplies display metadata and an optional normalized GitHub URL.
 type PageOptions struct {
 	Project, RepositoryURL, Branch string
 }
@@ -34,14 +34,17 @@ type PageOptions struct {
 // Render renders a complete HTML page with records in their supplied order.
 func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
 	data := page{Project: options.Project, Branch: options.Branch}
-	remoteURLPrefix := options.RepositoryURL + "/tree/" + url.PathEscape(options.Branch) + "/experiments/"
 	for _, record := range records {
 		created := record.CreatedAt.UTC()
+		var remoteURL string
+		if options.RepositoryURL != "" && options.Branch != "" {
+			remoteURL = options.RepositoryURL + "/tree/" + url.PathEscape(options.Branch) + "/experiments/" + url.PathEscape(record.ID)
+		}
 		data.Experiments = append(data.Experiments, experimentView{
 			ID: record.ID, Title: record.Title,
 			CreatedAt: created.Format("Jan 02, 2006 · 15:04:05 UTC"),
 			DateTime:  created.Format(time.RFC3339Nano),
-			GitHubURL: remoteURLPrefix + url.PathEscape(record.ID),
+			GitHubURL: remoteURL,
 		})
 	}
 	var body bytes.Buffer

@@ -32,13 +32,15 @@ const buildDescription = "Build a static experiment web page"
 
 const buildDetails = `Write a self-contained index.html snapshot, newest experiments first.
 Create the output directory if needed and replace its index.html on each build.
-Other files in the directory are left unchanged. GitHub links use the origin
-remote and current branch; they assume the experiment folders are published.
+Other files in the directory are left unchanged. GitHub links are included when
+origin points to GitHub and a branch is checked out; they assume the experiment
+folders are published. Otherwise the catalog is shown without remote links.
 The generated page needs no Git checkout or running ExpLedger server.`
 
 const serveDescription = "Browse experiments in a local web page"
 
 const serveDetails = `Serve experiment titles and creation times, newest first, on 127.0.0.1.
-Refresh the page to reread experiment metadata. GitHub links use the origin
-remote and branch checked out when the server starts; they assume the experiment
-folders are already published. Press Ctrl+C to stop the server.`
+Refresh the page to reread experiment metadata. GitHub links are included when
+origin points to GitHub and a branch is checked out when the server starts;
+they assume the experiment folders are published. Otherwise the catalog is shown
+without remote links. Press Ctrl+C to stop the server.`

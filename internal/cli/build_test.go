@@ -154,3 +154,37 @@ func TestBuildHelpAndArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildWithoutRemoteLinks(t *testing.T) {
+	for _, tt := range []struct {
+		name, remote string
+		detached     bool
+	}{
+		{name: "no origin"},
+		{name: "non-GitHub origin", remote: "https://gitlab.com/owner/repo.git"},
+		{name: "detached HEAD", remote: "https://github.com/owner/repo.git", detached: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+				t.Fatal(err)
+			}
+			git(t, root, "init", "--quiet", "--initial-branch=main")
+			if tt.remote != "" {
+				git(t, root, "remote", "add", "origin", tt.remote)
+			}
+			if tt.detached {
+				git(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "initial")
+				git(t, root, "checkout", "--quiet", "--detach", "HEAD")
+			}
+			var stdout bytes.Buffer
+			if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err != nil {
+				t.Fatal(err)
+			}
+			body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
+			if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="github"`)) {
+				t.Fatalf("local snapshot missing or includes remote links: %v\n%s", err, body)
+			}
+		})
+	}
+}
