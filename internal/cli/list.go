@@ -32,7 +32,7 @@ func listExperimentsCommand(app *application) *cobra.Command {
 			}
 			for _, record := range records {
 				id := displayID(record.ID)
-				title := strings.Join(strings.Fields(record.Title), " ")
+				title := displayTitle(record.Title)
 				if _, err := fmt.Fprintf(out, "%s\t%s\n", id, title); err != nil {
 					return err
 				}
@@ -49,4 +49,17 @@ func displayID(id string) string {
 		}
 	}
 	return id
+}
+
+func displayTitle(title string) string {
+	var out strings.Builder
+	for _, r := range strings.Join(strings.Fields(title), " ") {
+		if strconv.IsPrint(r) {
+			out.WriteRune(r)
+		} else {
+			quoted := strconv.QuoteRune(r)
+			out.WriteString(quoted[1 : len(quoted)-1])
+		}
+	}
+	return out.String()
 }

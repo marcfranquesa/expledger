@@ -87,17 +87,28 @@ func TestListPreservesIDs(t *testing.T) {
 	}
 }
 
-func TestListNormalizesTitleWhitespace(t *testing.T) {
-	root := t.TempDir()
-	git(t, root, "init", "--quiet")
-	writeListRecord(t, root, "20260924-record", experiment.Record{Schema: experiment.Schema, ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
-	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
-	if len(lines) != 2 || strings.Join(strings.Fields(lines[1]), " ") != "20260924-record Messy title continued" {
-		t.Fatalf("list did not keep the record on one line: %q", stdout.String())
+func TestListFormatsTitles(t *testing.T) {
+	for _, tc := range []struct {
+		title, display string
+	}{
+		{"Messy\t title\ncontinued", "Messy title continued"},
+		{`Café α "quoted" C:\scratch`, `Café α "quoted" C:\scratch`},
+		{"Terminal\x1b[2J\a\b\x00\x7f", `Terminal\x1b[2J\a\b\x00\x7f`},
+		{"Unicode\u009b\u202e", `Unicode\u009b\u202e`},
+	} {
+		t.Run(tc.display, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			writeListRecord(t, root, "20260924-record", experiment.Record{Schema: experiment.Schema, ID: "20260924-record", Title: tc.title, CreatedAt: metadataTestTime()})
+			var stdout bytes.Buffer
+			if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
+				t.Fatal(err)
+			}
+			lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+			if len(lines) != 2 || strings.TrimSpace(strings.TrimPrefix(lines[1], "20260924-record")) != tc.display {
+				t.Fatalf("list output = %q, want title %q on one line", stdout.String(), tc.display)
+			}
+		})
 	}
 }
 
