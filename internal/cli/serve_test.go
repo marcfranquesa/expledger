@@ -121,9 +121,9 @@ func TestGitHubLocationRequiresOriginAndBranch(t *testing.T) {
 		t.Fatalf("missing origin error = %v", err)
 	}
 	serveGit(t, root, "remote", "add", "origin", "git@github.com:owner/repo.git")
-	remote, branch, err := githubLocation(root)
-	if err != nil || remote != "https://github.com/owner/repo" || branch != "research/v2" {
-		t.Fatalf("GitHub location = %q, %q, %v", remote, branch, err)
+	prefix, branch, err := githubLocation(root)
+	if err != nil || prefix != "https://github.com/owner/repo/tree/research%2Fv2/experiments/" || branch != "research/v2" {
+		t.Fatalf("GitHub location = %q, %q, %v", prefix, branch, err)
 	}
 	serveGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "initial")
 	serveGit(t, root, "checkout", "--quiet", "--detach", "HEAD")

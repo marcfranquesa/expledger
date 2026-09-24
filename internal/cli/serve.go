@@ -33,7 +33,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repositoryURL, branch, err := githubLocation(app.repoRoot)
+			remoteURLPrefix, branch, err := githubLocation(app.repoRoot)
 			if err != nil {
 				return err
 			}
@@ -49,7 +49,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			server := &http.Server{
-				Handler:           web.NewHandler(app.repoRoot, repositoryURL, branch),
+				Handler:           web.NewHandler(app.repoRoot, remoteURLPrefix, branch),
 				ReadHeaderTimeout: 5 * time.Second,
 			}
 			finished := make(chan error, 1)
@@ -75,12 +75,12 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 	return cmd
 }
 
-func githubLocation(root string) (repositoryURL, branch string, err error) {
+func githubLocation(root string) (remoteURLPrefix, branch string, err error) {
 	remote, err := gitOutput(root, "remote", "get-url", "origin")
 	if err != nil {
 		return "", "", fmt.Errorf("serve requires an origin remote pointing to GitHub: %w", err)
 	}
-	repositoryURL, err = githubRepositoryURL(remote)
+	repositoryURL, err := githubRepositoryURL(remote)
 	if err != nil {
 		return "", "", err
 	}
@@ -91,7 +91,7 @@ func githubLocation(root string) (repositoryURL, branch string, err error) {
 	if branch == "" {
 		return "", "", errors.New("serve requires a checked-out branch; switch to a branch and try again")
 	}
-	return repositoryURL, branch, nil
+	return repositoryURL + "/tree/" + url.PathEscape(branch) + "/experiments/", branch, nil
 }
 
 func githubRepositoryURL(remote string) (string, error) {

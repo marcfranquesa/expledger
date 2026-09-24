@@ -27,21 +27,12 @@ type page struct {
 	Experiments     []experimentView
 }
 
-// NewHandler reads the catalog on each request. GitHub links use the repository
-// and branch selected when the server starts.
-func NewHandler(root, repositoryURL, branch string) http.Handler {
-	remoteURL := repositoryURL + "/tree/" + url.PathEscape(branch) + "/experiments/"
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// NewHandler reads the catalog on each request. remoteURLPrefix includes the
+// trailing slash before the experiment ID; branch is displayed in the page.
+func NewHandler(root, remoteURLPrefix, branch string) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			w.Header().Set("Allow", "GET, HEAD")
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
 		records, err := catalog.List(root)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -54,7 +45,7 @@ func NewHandler(root, repositoryURL, branch string) http.Handler {
 				ID: record.ID, Title: record.Title,
 				CreatedAt: created.Format("Jan 02, 2006 · 15:04:05 UTC"),
 				DateTime:  created.Format(time.RFC3339Nano),
-				GitHubURL: remoteURL + url.PathEscape(record.ID),
+				GitHubURL: remoteURLPrefix + url.PathEscape(record.ID),
 			})
 		}
 		var body bytes.Buffer
@@ -67,4 +58,5 @@ func NewHandler(root, repositoryURL, branch string) http.Handler {
 			_, _ = w.Write(body.Bytes())
 		}
 	})
+	return mux
 }
