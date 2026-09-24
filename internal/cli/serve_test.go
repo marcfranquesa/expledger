@@ -45,7 +45,7 @@ func TestServeStartsAndStops(t *testing.T) {
 	for _, withRemote := range []bool{false, true} {
 		name := "local only"
 		if withRemote {
-			name = "GitHub remote"
+			name = "remote link"
 		}
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -97,27 +97,27 @@ func TestServeStartsAndStops(t *testing.T) {
 	}
 }
 
-func TestGitHubLocationOptional(t *testing.T) {
+func TestRemoteLocationOptional(t *testing.T) {
 	root := t.TempDir()
 	serveGit(t, root, "init", "--quiet", "--initial-branch=research/v2")
-	if repositoryURL, branch, err := githubLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "research/v2" {
+	if repositoryURL, branch, err := remoteLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "research/v2" {
 		t.Fatalf("local location = %q, %q, %v", repositoryURL, branch, err)
 	}
 	serveGit(t, root, "remote", "add", "origin", "https://gitlab.com/owner/repo.git")
-	if repositoryURL, branch, err := githubLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "research/v2" {
-		t.Fatalf("non-GitHub location = %q, %q, %v", repositoryURL, branch, err)
+	if repositoryURL, branch, err := remoteLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "research/v2" {
+		t.Fatalf("unsupported remote location = %q, %q, %v", repositoryURL, branch, err)
 	}
 	serveGit(t, root, "remote", "set-url", "origin", "git@github.com:owner/repo.git")
-	repositoryURL, branch, err := githubLocation(context.Background(), root)
+	repositoryURL, branch, err := remoteLocation(context.Background(), root)
 	if err != nil || repositoryURL != "https://github.com/owner/repo" || branch != "research/v2" {
-		t.Fatalf("GitHub location = %q, %q, %v", repositoryURL, branch, err)
+		t.Fatalf("remote location = %q, %q, %v", repositoryURL, branch, err)
 	}
 	serveGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "initial")
 	serveGit(t, root, "checkout", "--quiet", "--detach", "HEAD")
-	if repositoryURL, branch, err := githubLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "" {
+	if repositoryURL, branch, err := remoteLocation(context.Background(), root); err != nil || repositoryURL != "" || branch != "" {
 		t.Fatalf("detached location = %q, %q, %v", repositoryURL, branch, err)
 	}
-	if _, _, err := githubLocation(context.Background(), t.TempDir()); err == nil {
+	if _, _, err := remoteLocation(context.Background(), t.TempDir()); err == nil {
 		t.Fatal("Git discovery errors must not be hidden")
 	}
 }

@@ -21,9 +21,9 @@
     h2 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
     .id { display: block; margin-top: 4px; color: #60605a; overflow-wrap: anywhere; }
     time { display: block; margin-top: 10px; color: #60605a; font-size: 12px; font-variant-numeric: tabular-nums; }
-    .github { flex-shrink: 0; display: inline-block; padding: 9px 12px; border: 1px solid #d4d4ce; border-radius: 6px; color: #33332e; background: #fff; font-size: 13px; text-decoration: none; }
-    .github:hover { border-color: #8c8c83; background: #f3f3ef; }
-    .github:focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
+    .remote-link { flex-shrink: 0; display: inline-block; padding: 9px 12px; border: 1px solid #d4d4ce; border-radius: 6px; color: #33332e; background: #fff; font-size: 13px; text-decoration: none; }
+    .remote-link:hover { border-color: #8c8c83; background: #f3f3ef; }
+    .remote-link:focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
     .empty { padding: 44px 0; }
     .empty p { color: #60605a; line-height: 1.7; }
     @media (max-width: 600px) {
@@ -50,7 +50,7 @@
           <code class="id">{{.ID}}</code>
           <time datetime="{{.DateTime}}">{{.CreatedAt}}</time>
         </div>
-        {{if .GitHubURL}}<a class="github" href="{{.GitHubURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}
+        {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}
       </li>
       {{end}}
     </ol>

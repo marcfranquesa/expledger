@@ -46,7 +46,7 @@ func gitOutput(ctx context.Context, cwd string, isolateRepository bool, args ...
 	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), err
 }
 
-func githubLocation(ctx context.Context, root string) (repositoryURL, branch string, err error) {
+func remoteLocation(ctx context.Context, root string) (repositoryURL, branch string, err error) {
 	branch, err = gitOutput(ctx, root, false, "branch", "--show-current")
 	if err != nil {
 		return "", "", fmt.Errorf("read current Git branch: %w", err)
