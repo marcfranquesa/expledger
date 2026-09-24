@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
@@ -54,6 +54,7 @@ func List(root string) ([]experiment.Record, error) {
 		}
 		records = append(records, record)
 	}
-	sort.SliceStable(records, func(i, j int) bool { return records[i].ID > records[j].ID })
+	// ReadDir sorts directory names, which match the validated IDs.
+	slices.Reverse(records)
 	return records, nil
 }
