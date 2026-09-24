@@ -39,7 +39,7 @@ expledger new --help
 
 `--title` defaults to a title derived from the slug. Each `--based-on` takes one parent experiment ID; repeat the flag for multiple parents. Both flags require nonempty values.
 
-Running `expledger` without arguments shows help.
+Running `expledger` without arguments shows help. Help works outside a Git repository. Experiment commands resolve the Git working tree root before running and report an error outside a repository.
 
 The README contains YAML `id` and `title` fields, followed by Markdown sections for the hypothesis, method, and finding. The ID stays fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
 
@@ -62,6 +62,6 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
-The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree, `help.go` holds help text, and `new.go` handles experiment creation and Git root discovery. `internal/experiment` handles directory creation and README encoding and parsing. Tests live beside the code they exercise.
+The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree and resolves the Git root in a shared pre-run hook, `help.go` holds help text, and `new.go` handles experiment creation using the resolved path. `internal/experiment` handles directory creation and README encoding and parsing. Tests live beside the code they exercise.
 
 Front matter contains one YAML mapping with explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

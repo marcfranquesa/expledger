@@ -60,6 +60,7 @@ func TestRootHelp(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
+			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
 			if err := cli.Run(tt.args, root, time.Now(), &stdout); err != nil {
 				t.Fatal(err)
@@ -84,6 +85,7 @@ func TestNewHelp(t *testing.T) {
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			root := t.TempDir()
+			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
 			if err := cli.Run(args, root, time.Now(), &stdout); err != nil {
 				t.Fatal(err)
@@ -141,6 +143,40 @@ func TestRunDoesNotRetainCommandState(t *testing.T) {
 	}
 	if got := stdout.String(); !strings.Contains(got, "Available Commands:") {
 		t.Fatalf("no-argument invocation did not reset to root help: %q", got)
+	}
+}
+
+func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
+	for _, args := range [][]string{
+		{"unknown"},
+		{"--unknown"},
+		{"new", "my-idea", "--unknown"},
+		{"new"},
+		{"new", "my-idea", "another-idea"},
+		{"new", "my-idea", "--title", ""},
+		{"new", "my-idea", "--title", " \t "},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root := t.TempDir()
+			t.Setenv("PATH", t.TempDir())
+			var stdout bytes.Buffer
+			err := cli.Run(args, root, time.Now(), &stdout)
+			if err == nil {
+				t.Fatalf("expected a usage error for %q", args)
+			}
+			if strings.Contains(err.Error(), "find Git working tree") {
+				t.Fatalf("Git lookup ran before argument validation: %v", err)
+			}
+			assertEmptyDirectory(t, root)
+		})
+	}
+}
+
+func TestRunDoesNotRetainRepositoryRoot(t *testing.T) {
+	for range 2 {
+		root := t.TempDir()
+		git(t, root, "init", "--quiet")
+		assertNew(t, root, root)
 	}
 }
 
