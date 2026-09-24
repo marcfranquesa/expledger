@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -41,7 +42,7 @@ func TestNewMetadataFlags(t *testing.T) {
 			createMetadataParent(t, root, "baseline", 20)
 			createMetadataParent(t, root, "comparison", 21)
 			var stdout bytes.Buffer
-			if err := cli.Run(tt.args, root, metadataTestTime(), &stdout); err != nil {
+			if err := cli.Run(context.Background(), tt.args, root, metadataTestTime(), &stdout); err != nil {
 				t.Fatal(err)
 			}
 			record := readNewRecord(t, root, "my-idea")
@@ -77,7 +78,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 			git(t, root, "init", "--quiet")
 			var stdout bytes.Buffer
 			args := append([]string{"new", "my-idea"}, tt.flags...)
-			if err := cli.Run(args, root, metadataTestTime(), &stdout); err == nil {
+			if err := cli.Run(context.Background(), args, root, metadataTestTime(), &stdout); err == nil {
 				t.Fatalf("expected an error for %q", args)
 			}
 			entries, err := os.ReadDir(root)
@@ -96,11 +97,11 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	git(t, root, "init", "--quiet")
 	createMetadataParent(t, root, "baseline", 20)
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run([]string{"new", "next-idea"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "next-idea"}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatal(err)
 	}
 	record := readNewRecord(t, root, "next-idea")
@@ -132,7 +133,7 @@ func TestNewRejectsMissingParent(t *testing.T) {
 			}
 			args = append(args, "--based-on", parent)
 			var stdout bytes.Buffer
-			err := cli.Run(args, root, metadataTestTime(), &stdout)
+			err := cli.Run(context.Background(), args, root, metadataTestTime(), &stdout)
 			if err == nil || !strings.Contains(err.Error(), parent) {
 				t.Fatalf("expected error naming missing parent %q, got %v", parent, err)
 			}
@@ -187,7 +188,7 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 				t.Fatal(err)
 			}
 			var stdout bytes.Buffer
-			err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
+			err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
 			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", parent, "README.md")) {
 				t.Fatalf("expected error naming invalid parent README, got %v", err)
 			}
@@ -240,13 +241,13 @@ func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
 				t.Fatal(err)
 			}
 			var stdout bytes.Buffer
-			if err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
+			if err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
 				t.Fatalf("valid parent rejected because of unrelated experiment: %v", err)
 			}
 			if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
 				t.Fatalf("based_on = %v, want [%s]", got, parent)
 			}
-			if err := cli.Run([]string{"new", "independent"}, root, metadataTestTime(), &stdout); err != nil {
+			if err := cli.Run(context.Background(), []string{"new", "independent"}, root, metadataTestTime(), &stdout); err != nil {
 				t.Fatalf("independent creation rejected invalid catalog: %v", err)
 			}
 			if record := readNewRecord(t, root, "independent"); len(record.BasedOn) != 0 {
@@ -277,7 +278,7 @@ func TestNewRejectsExistingExperiment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	err = cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout)
+	err = cli.Run(context.Background(), []string{"new", "my-idea"}, root, metadataTestTime(), &stdout)
 	if !errors.Is(err, os.ErrExist) {
 		t.Fatalf("duplicate error = %v, want os.ErrExist", err)
 	}
@@ -296,7 +297,7 @@ func TestNewDoesNotValidateAncestors(t *testing.T) {
 	const parent = "20260920-baseline"
 	writeREADME(t, root, parent, []byte("---\nid: "+parent+"\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\nbased_on: [20260919-missing]\n---\n"))
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatalf("valid direct parent was rejected: %v", err)
 	}
 	if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
@@ -307,7 +308,7 @@ func TestNewDoesNotValidateAncestors(t *testing.T) {
 func TestNewHelpDescribesMetadataFlags(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"new", "--help"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -11,7 +12,7 @@ import (
 func main() {
 	cwd, err := os.Getwd()
 	if err == nil {
-		err = cli.Run(os.Args[1:], cwd, time.Now(), os.Stdout)
+		err = cli.Run(context.Background(), os.Args[1:], cwd, time.Now(), os.Stdout)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "expledger:", err)
