@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -31,7 +32,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			remoteURLPrefix, branch, err := githubLocation(app.repoRoot)
+			repositoryURL, branch, err := githubLocation(app.repoRoot)
 			if err != nil {
 				return err
 			}
@@ -47,7 +48,9 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			server := &http.Server{
-				Handler:           web.NewHandler(app.repoRoot, remoteURLPrefix, branch),
+				Handler: web.NewHandler(app.repoRoot, web.PageOptions{
+					Project: filepath.Base(app.repoRoot), RepositoryURL: repositoryURL, Branch: branch,
+				}),
 				ReadHeaderTimeout: 5 * time.Second,
 			}
 			finished := make(chan error, 1)

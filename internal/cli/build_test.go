@@ -25,7 +25,7 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.Mkdir(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, "https://github.com/owner/repo/tree/research%2Fv2/experiments/", "research/v2")
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/owner/repo", Branch: "research/v2"})
 	for _, output := range []string{"", "site/output", filepath.Join(t.TempDir(), "absolute")} {
 		args := []string{"build"}
 		dir := output

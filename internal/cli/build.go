@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/web"
 	"github.com/spf13/cobra"
 )
@@ -28,11 +29,17 @@ func buildExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			remoteURLPrefix, branch, err := githubLocation(app.repoRoot)
+			repositoryURL, branch, err := githubLocation(app.repoRoot)
 			if err != nil {
 				return err
 			}
-			body, err := web.Render(app.repoRoot, remoteURLPrefix, branch)
+			records, err := catalog.List(app.repoRoot)
+			if err != nil {
+				return err
+			}
+			body, err := web.Render(records, web.PageOptions{
+				Project: filepath.Base(app.repoRoot), RepositoryURL: repositoryURL, Branch: branch,
+			})
 			if err != nil {
 				return err
 			}

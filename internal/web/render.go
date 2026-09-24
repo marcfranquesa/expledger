@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"html/template"
 	"net/url"
-	"path/filepath"
 	"time"
 
-	"github.com/marcfranquesa/expledger/internal/catalog"
+	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 //go:embed index.html
@@ -27,14 +26,15 @@ type page struct {
 	Experiments     []experimentView
 }
 
-// Render reads the catalog and renders a complete HTML page. remoteURLPrefix
-// includes the trailing slash before the experiment ID.
-func Render(root, remoteURLPrefix, branch string) ([]byte, error) {
-	records, err := catalog.List(root)
-	if err != nil {
-		return nil, err
-	}
-	data := page{Project: filepath.Base(root), Branch: branch}
+// PageOptions supplies display metadata and the normalized GitHub repository URL.
+type PageOptions struct {
+	Project, RepositoryURL, Branch string
+}
+
+// Render renders a complete HTML page with records in their supplied order.
+func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
+	data := page{Project: options.Project, Branch: options.Branch}
+	remoteURLPrefix := options.RepositoryURL + "/tree/" + url.PathEscape(options.Branch) + "/experiments/"
 	for _, record := range records {
 		created := record.CreatedAt.UTC()
 		data.Experiments = append(data.Experiments, experimentView{

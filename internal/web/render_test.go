@@ -1,0 +1,51 @@
+package web_test
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/marcfranquesa/expledger/internal/experiment"
+	"github.com/marcfranquesa/expledger/internal/web"
+)
+
+func TestRenderInMemory(t *testing.T) {
+	records := []experiment.Record{
+		{
+			ID: "first # record", Title: "<script>Trial & result</script>",
+			CreatedAt: time.Date(2026, 9, 24, 12, 30, 0, 123456789, time.FixedZone("local", -4*60*60)),
+			Body:      []byte("Private experiment notes"),
+		},
+		{
+			ID: "second", Title: "Later timestamp, supplied second",
+			CreatedAt: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC),
+		},
+	}
+	body, err := web.Render(records, web.PageOptions{
+		Project: "Explicit / project & notes", RepositoryURL: "https://github.com/owner/repo", Branch: "research/next",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	for _, want := range []string{
+		"Explicit / project &amp; notes",
+		"&lt;script&gt;Trial &amp; result&lt;/script&gt;",
+		`href="https://github.com/owner/repo/tree/research%2Fnext/experiments/first%20%23%20record"`,
+		`datetime="2026-09-24T16:30:00.123456789Z"`,
+		"Sep 24, 2026 · 16:30:00 UTC",
+		"Later timestamp, supplied second",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("page missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"<script>", "Private experiment notes"} {
+		if strings.Contains(page, unwanted) {
+			t.Errorf("page contains %q", unwanted)
+		}
+	}
+	if strings.Index(page, "first # record") >= strings.Index(page, "Later timestamp, supplied second") {
+		t.Fatal("renderer changed the supplied record order")
+	}
+}
