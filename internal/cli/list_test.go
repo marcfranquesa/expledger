@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,49 @@ func TestListFromNestedDirectory(t *testing.T) {
 	}
 }
 
-func TestListNormalizesWhitespace(t *testing.T) {
+func TestListPreservesIDs(t *testing.T) {
+	for _, tc := range []struct {
+		id, display string
+	}{
+		{"20260924-record", "20260924-record"},
+		{"café-α", "café-α"},
+		{"trial one", `"trial one"`},
+		{"trial  one", `"trial  one"`},
+		{" trial", `" trial"`},
+		{"trial ", `"trial "`},
+		{"trial\tone", `"trial\tone"`},
+		{"trial\none", `"trial\none"`},
+		{`trial"one`, `"trial\"one"`},
+		{`"trial one"`, `"\"trial one\""`},
+		{"trial\x1bone", `"trial\x1bone"`},
+	} {
+		t.Run(tc.display, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			writeListRecord(t, root, tc.id, experiment.Record{Schema: experiment.Schema, ID: tc.id, Title: "Title", CreatedAt: metadataTestTime()})
+			var stdout bytes.Buffer
+			if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
+				t.Fatal(err)
+			}
+			lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+			if len(lines) != 2 || !strings.HasSuffix(lines[1], "  Title") {
+				t.Fatalf("list output = %q, want a header and one title row", stdout.String())
+			}
+			got := strings.TrimRight(strings.TrimSuffix(lines[1], "Title"), " ")
+			if got != tc.display {
+				t.Errorf("displayed ID = %q, want %q", got, tc.display)
+			}
+			if strings.HasPrefix(got, `"`) {
+				decoded, err := strconv.Unquote(got)
+				if err != nil || decoded != tc.id {
+					t.Errorf("unquoted ID = %q, err = %v; want %q", decoded, err, tc.id)
+				}
+			}
+		})
+	}
+}
+
+func TestListNormalizesTitleWhitespace(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
 	writeListRecord(t, root, "20260924-record", experiment.Record{Schema: experiment.Schema, ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
