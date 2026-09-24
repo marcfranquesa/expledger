@@ -207,6 +207,47 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 	}
 }
 
+func TestNewValidatesCatalogOnlyWithParents(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		readme string
+	}{
+		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\n---\n"},
+		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\n---\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			createMetadataParent(t, root, "baseline", 20)
+			createMetadataParent(t, root, "unrelated", 21)
+			readme := filepath.Join(root, "experiments", "20260921-unrelated", "README.md")
+			if err := os.WriteFile(readme, []byte(tt.readme), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var stdout bytes.Buffer
+			err := cli.Run([]string{"new", "my-idea", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout)
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("20260921-unrelated", "README.md")) {
+				t.Fatalf("expected unrelated record error before creation, got %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("failed command printed output: %q", stdout.String())
+			}
+			if _, err := os.Stat(filepath.Join(root, "experiments", "20260924-my-idea")); !os.IsNotExist(err) {
+				t.Fatalf("invalid catalog unexpectedly created child: err=%v", err)
+			}
+			if err := cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout); err != nil {
+				t.Fatalf("independent creation rejected invalid catalog: %v", err)
+			}
+			if record := readNewRecord(t, root, "my-idea"); len(record.BasedOn) != 0 {
+				t.Fatalf("independent record has parents: %v", record.BasedOn)
+			}
+			if data, err := os.ReadFile(readme); err != nil || string(data) != tt.readme {
+				t.Fatalf("creation changed unrelated README: data=%q, err=%v", data, err)
+			}
+		})
+	}
+}
+
 func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")

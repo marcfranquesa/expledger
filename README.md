@@ -56,7 +56,7 @@ based_on:
 
 `created_at` records creation time as an RFC3339 timestamp in UTC, preserving fractional seconds. Older records may omit it; their creation time remains unknown and is not filled in when read or re-encoded. The date in the experiment ID still uses local time.
 
-`based_on` describes experiment ancestry. Parent IDs passed with `--based-on` are resolved from validated README metadata before any files are created. Missing or invalid records anywhere in the catalog block parent lookup. References are not checked for cycles. Independent experiments omit this field. There is no status field.
+`based_on` describes experiment ancestry. When `--based-on` is supplied, the catalog is loaded and validated once, then reused to resolve every parent ID before any files are created. Missing or invalid records anywhere in the catalog block parent lookup. References are not checked for cycles. Independent experiments omit this field. There is no status field.
 
 ```sh
 expledger list
@@ -94,7 +94,7 @@ go run ./cmd/expledger --help
 The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
 
 - `internal/cli`: command arguments, orchestration, and terminal output.
-- `internal/catalog`: validated discovery and lookup (`List` and `Lookup`), plus directory-existence checks (`Exists`) for overwrite protection.
+- `internal/catalog`: discovery and validation (`List`), lookup of loaded records (`Lookup`), and directory-existence checks (`Exists`) for overwrite protection.
 - `internal/experiment`: individual records, IDs, creation, and YAML parsing.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

@@ -7,13 +7,9 @@ import (
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
-// Lookup validates the catalog and returns the record with the given ID.
+// Lookup returns the record with the given ID from records loaded by List.
 // A missing ID returns an error wrapping os.ErrNotExist.
-func Lookup(root, id string) (experiment.Record, error) {
-	records, err := List(root)
-	if err != nil {
-		return experiment.Record{}, err
-	}
+func Lookup(records []experiment.Record, id string) (experiment.Record, error) {
 	for _, record := range records {
 		if record.ID == id {
 			return record, nil
