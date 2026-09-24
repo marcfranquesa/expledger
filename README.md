@@ -11,15 +11,12 @@ experiments/20260924-baseline/
 ```
 
 ExpLedger discovers only folders containing `expledger.yaml` with
-`schema: expledger/v1`. The README is for notes; its contents and front matter
-are never used as experiment metadata. Other tools can keep their own files
-alongside it.
-
-This is a breaking format change: README-only records are no longer discovered.
-There is no legacy reader or migration command.
+`schema: expledger/v1`.
 
 The [record format](docs/format.md) defines metadata, parent references, and
 filesystem rules for hand-written records and integrations.
+
+ExpLedger is in active development. Expect breaking changes.
 
 ## Commands
 
