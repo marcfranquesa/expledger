@@ -22,6 +22,7 @@ Display IDs and titles by created_at, newest first.
 Each YAML id must exactly match its experiment folder name.
 IDs containing whitespace, quotes, or non-printable characters are double-quoted,
 using Go-style escapes such as \t and \n.
+Title whitespace is collapsed to spaces; other non-printable characters are escaped.
 Ignore directories without expledger.yaml. Report invalid metadata with its path.`
 
 const validateDescription = "Validate experiment metadata"
