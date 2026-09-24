@@ -47,16 +47,51 @@ func TestNewOutsideGit(t *testing.T) {
 	}
 }
 
-func TestHelp(t *testing.T) {
-	for _, arg := range []string{"help", "--help", "-h"} {
-		t.Run(arg, func(t *testing.T) {
+func TestRootHelp(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{name: "nil arguments"},
+		{name: "empty arguments", args: []string{}},
+		{name: "help command", args: []string{"help"}},
+		{name: "help flag", args: []string{"--help"}},
+		{name: "short help flag", args: []string{"-h"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
 			var stdout bytes.Buffer
-			if err := cli.Run([]string{arg}, t.TempDir(), time.Now(), &stdout); err != nil {
+			if err := cli.Run(tt.args, root, time.Now(), &stdout); err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(stdout.String(), "expledger new") {
-				t.Fatalf("help does not describe the new command: %q", stdout.String())
+			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "new") {
+				t.Fatalf("root help does not list commands: %q", got)
 			}
+			if strings.Contains(stdout.String(), "completion") {
+				t.Fatalf("root help lists an unsupported completion command: %q", stdout.String())
+			}
+			assertEmptyDirectory(t, root)
+		})
+	}
+}
+
+func TestNewHelp(t *testing.T) {
+	for _, args := range [][]string{
+		{"help", "new"},
+		{"new", "--help"},
+		{"new", "-h"},
+		{"new", "my-idea", "--help"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root := t.TempDir()
+			var stdout bytes.Buffer
+			if err := cli.Run(args, root, time.Now(), &stdout); err != nil {
+				t.Fatal(err)
+			}
+			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger new <slug>") {
+				t.Fatalf("new help does not describe command usage: %q", got)
+			}
+			assertEmptyDirectory(t, root)
 		})
 	}
 }
@@ -66,18 +101,57 @@ func TestInvalidArguments(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "no command"},
 		{name: "unknown command", args: []string{"unknown"}},
+		{name: "unknown root flag", args: []string{"--unknown"}},
+		{name: "unknown new flag", args: []string{"new", "my-idea", "--unknown"}},
 		{name: "missing slug", args: []string{"new"}},
 		{name: "extra slug", args: []string{"new", "my-idea", "another-idea"}},
-		{name: "extra help argument", args: []string{"help", "extra"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
 			var stdout bytes.Buffer
-			if err := cli.Run(tt.args, t.TempDir(), time.Now(), &stdout); err == nil {
+			if err := cli.Run(tt.args, root, time.Now(), &stdout); err == nil {
 				t.Fatalf("expected error for arguments %q", tt.args)
 			}
+			entries, err := os.ReadDir(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(entries) != 1 || entries[0].Name() != ".git" {
+				t.Fatalf("invalid command unexpectedly created files: %v", entries)
+			}
 		})
+	}
+}
+
+func TestRunDoesNotRetainCommandState(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	var stdout bytes.Buffer
+	if err := cli.Run([]string{"new", "--help"}, root, time.Now(), &stdout); err != nil {
+		t.Fatal(err)
+	}
+
+	assertNew(t, root, root)
+
+	stdout.Reset()
+	if err := cli.Run(nil, root, time.Now(), &stdout); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); !strings.Contains(got, "Available Commands:") {
+		t.Fatalf("no-argument invocation did not reset to root help: %q", got)
+	}
+}
+
+func assertEmptyDirectory(t *testing.T, path string) {
+	t.Helper()
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("command unexpectedly created files in %s: %v", path, entries)
 	}
 }
 

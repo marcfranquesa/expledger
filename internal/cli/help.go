@@ -1,17 +1,11 @@
 package cli
 
-import (
-	"errors"
-	"fmt"
-	"io"
-)
+const rootDescription = "Manage experiment records in a Git repository"
 
-const usage = "usage: expledger new <slug>"
+const newDescription = "Create an experiment folder and README"
 
-func runHelp(args []string, stdout io.Writer) error {
-	if len(args) != 0 {
-		return errors.New(usage)
-	}
-	_, err := fmt.Fprintln(stdout, usage)
-	return err
-}
+const newDetails = `Create experiments/YYYYMMDD-<slug>/README.md at the Git working tree root.
+The date uses your local time. Slugs contain lowercase letters, digits, and
+single hyphens between words. Existing experiments are never overwritten.`
+
+const newExample = "  expledger new my-idea"

@@ -2,21 +2,24 @@
 package cli
 
 import (
-	"errors"
 	"io"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
-	if len(args) == 0 {
-		return errors.New(usage)
+	root := &cobra.Command{
+		Use:           "expledger",
+		Short:         rootDescription,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 	}
-	switch args[0] {
-	case "help", "--help", "-h":
-		return runHelp(args[1:], stdout)
-	case "new":
-		return runNew(args[1:], cwd, now, stdout)
-	default:
-		return errors.New(usage)
-	}
+	root.SetArgs(append([]string{}, args...))
+	root.SetOut(stdout)
+	root.AddCommand(newExperimentCommand(cwd, now))
+	return root.Execute()
 }
