@@ -7,8 +7,8 @@ const newDescription = "Create an experiment folder and README"
 const newDetails = `Create experiments/YYYYMMDD-<slug>/README.md at the Git working tree root.
 The date uses your local time. Slugs contain lowercase letters, digits, and
 single hyphens between words. Existing experiments are never overwritten.
-Parent IDs passed with --based-on must exist in the validated catalog.
-Each README's YAML id must exactly match its experiment folder name.`
+Validate only the direct parents named by --based-on. Each must have a valid
+README whose YAML id exactly matches its experiment folder name.`
 
 const newExample = `  expledger new my-idea
   expledger new my-idea --title "My experiment" --based-on 20260920-baseline

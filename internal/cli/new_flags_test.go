@@ -155,16 +155,22 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 	const parent = "20260920-baseline"
 	for _, tt := range []struct {
 		name   string
+		folder string
 		readme string
 	}{
 		{name: "missing README"},
 		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
 		{name: "mismatched ID", readme: "---\nid: 20260920-other\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
+		{name: "case mismatched folder", folder: "20260920-Baseline", readme: "---\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
-			dir := filepath.Join(root, "experiments", parent)
+			folder := tt.folder
+			if folder == "" {
+				folder = parent
+			}
+			dir := filepath.Join(root, "experiments", folder)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -188,7 +194,7 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 				t.Fatalf("failed command printed output: %q", stdout.String())
 			}
 			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
-			if err != nil || len(entries) != 1 || entries[0].Name() != parent {
+			if err != nil || len(entries) != 1 || entries[0].Name() != folder {
 				t.Fatalf("invalid parent unexpectedly created files: entries=%v, err=%v", entries, err)
 			}
 			data, err := os.ReadFile(notesPath)
@@ -207,11 +213,13 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 	}
 }
 
-func TestNewValidatesCatalogOnlyWithParents(t *testing.T) {
+func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
+	const parent = "20260920-baseline"
 	for _, tt := range []struct {
 		name   string
 		readme string
 	}{
+		{name: "missing README"},
 		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
 		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
 	} {
@@ -221,27 +229,34 @@ func TestNewValidatesCatalogOnlyWithParents(t *testing.T) {
 			createMetadataParent(t, root, "baseline", 20)
 			createMetadataParent(t, root, "unrelated", 21)
 			readme := filepath.Join(root, "experiments", "20260921-unrelated", "README.md")
-			if err := os.WriteFile(readme, []byte(tt.readme), 0o644); err != nil {
+			var err error
+			if tt.readme == "" {
+				err = os.Remove(readme)
+			} else {
+				err = os.WriteFile(readme, []byte(tt.readme), 0o644)
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
 			var stdout bytes.Buffer
-			err := cli.Run([]string{"new", "my-idea", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("20260921-unrelated", "README.md")) {
-				t.Fatalf("expected unrelated record error before creation, got %v", err)
+			if err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
+				t.Fatalf("valid parent rejected because of unrelated experiment: %v", err)
 			}
-			if stdout.Len() != 0 {
-				t.Fatalf("failed command printed output: %q", stdout.String())
+			if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
+				t.Fatalf("based_on = %v, want [%s]", got, parent)
 			}
-			if _, err := os.Stat(filepath.Join(root, "experiments", "20260924-my-idea")); !os.IsNotExist(err) {
-				t.Fatalf("invalid catalog unexpectedly created child: err=%v", err)
-			}
-			if err := cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout); err != nil {
+			if err := cli.Run([]string{"new", "independent"}, root, metadataTestTime(), &stdout); err != nil {
 				t.Fatalf("independent creation rejected invalid catalog: %v", err)
 			}
-			if record := readNewRecord(t, root, "my-idea"); len(record.BasedOn) != 0 {
+			if record := readNewRecord(t, root, "independent"); len(record.BasedOn) != 0 {
 				t.Fatalf("independent record has parents: %v", record.BasedOn)
 			}
-			if data, err := os.ReadFile(readme); err != nil || string(data) != tt.readme {
+			data, err := os.ReadFile(readme)
+			if tt.readme == "" {
+				if !os.IsNotExist(err) {
+					t.Fatalf("creation changed missing unrelated README: err=%v", err)
+				}
+			} else if err != nil || string(data) != tt.readme {
 				t.Fatalf("creation changed unrelated README: data=%q, err=%v", data, err)
 			}
 		})

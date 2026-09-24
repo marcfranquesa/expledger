@@ -26,15 +26,9 @@ func newExperimentCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(opts.BasedOn) > 0 {
-				records, err := catalog.List(app.repoRoot)
-				if err != nil {
-					return fmt.Errorf("validate experiment catalog: %w", err)
-				}
-				for _, parent := range opts.BasedOn {
-					if _, err := catalog.Lookup(records, parent); err != nil {
-						return fmt.Errorf("check parent experiment %q: %w", parent, err)
-					}
+			for _, parent := range opts.BasedOn {
+				if _, err := catalog.Read(app.repoRoot, parent); err != nil {
+					return fmt.Errorf("check parent experiment %q: %w", parent, err)
 				}
 			}
 			dir, err := experiment.Create(app.repoRoot, args[0], app.now, opts)
