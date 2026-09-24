@@ -2,6 +2,9 @@
 
 ExpLedger records coding experiments as folders with YAML metadata and Markdown notes in your Git repository.
 
+The [record format](docs/format.md) defines metadata, parent references, and
+filesystem rules for hand-written records and integrations.
+
 ## Commands
 
 | Name | Description |
