@@ -151,6 +151,103 @@ func TestNewRejectsMissingParent(t *testing.T) {
 	}
 }
 
+func TestNewRejectsInvalidParentRecord(t *testing.T) {
+	const parent = "20260920-baseline"
+	for _, tt := range []struct {
+		name   string
+		readme string
+	}{
+		{name: "missing README"},
+		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Baseline\n---\n\nOriginal research notes.\n"},
+		{name: "mismatched ID", readme: "---\nid: 20260920-other\ntitle: Baseline\n---\n\nOriginal research notes.\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			dir := filepath.Join(root, "experiments", parent)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			readme := filepath.Join(dir, "README.md")
+			if tt.readme != "" {
+				if err := os.WriteFile(readme, []byte(tt.readme), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			notes := []byte("Existing parent notes.\n")
+			notesPath := filepath.Join(dir, "notes.md")
+			if err := os.WriteFile(notesPath, notes, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var stdout bytes.Buffer
+			err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", parent, "README.md")) {
+				t.Fatalf("expected error naming invalid parent README, got %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("failed command printed output: %q", stdout.String())
+			}
+			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
+			if err != nil || len(entries) != 1 || entries[0].Name() != parent {
+				t.Fatalf("invalid parent unexpectedly created files: entries=%v, err=%v", entries, err)
+			}
+			data, err := os.ReadFile(notesPath)
+			if err != nil || !bytes.Equal(data, notes) {
+				t.Fatalf("invalid parent changed existing notes: data=%q, err=%v", data, err)
+			}
+			data, err = os.ReadFile(readme)
+			if tt.readme == "" {
+				if !os.IsNotExist(err) {
+					t.Fatalf("missing parent README unexpectedly created: err=%v", err)
+				}
+			} else if err != nil || string(data) != tt.readme {
+				t.Fatalf("invalid parent changed existing README: data=%q, err=%v", data, err)
+			}
+		})
+	}
+}
+
+func TestNewValidatesCatalogOnlyWithParents(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		readme string
+	}{
+		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\n---\n"},
+		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\n---\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			createMetadataParent(t, root, "baseline", 20)
+			createMetadataParent(t, root, "unrelated", 21)
+			readme := filepath.Join(root, "experiments", "20260921-unrelated", "README.md")
+			if err := os.WriteFile(readme, []byte(tt.readme), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var stdout bytes.Buffer
+			err := cli.Run([]string{"new", "my-idea", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout)
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("20260921-unrelated", "README.md")) {
+				t.Fatalf("expected unrelated record error before creation, got %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("failed command printed output: %q", stdout.String())
+			}
+			if _, err := os.Stat(filepath.Join(root, "experiments", "20260924-my-idea")); !os.IsNotExist(err) {
+				t.Fatalf("invalid catalog unexpectedly created child: err=%v", err)
+			}
+			if err := cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout); err != nil {
+				t.Fatalf("independent creation rejected invalid catalog: %v", err)
+			}
+			if record := readNewRecord(t, root, "my-idea"); len(record.BasedOn) != 0 {
+				t.Fatalf("independent record has parents: %v", record.BasedOn)
+			}
+			if data, err := os.ReadFile(readme); err != nil || string(data) != tt.readme {
+				t.Fatalf("creation changed unrelated README: data=%q, err=%v", data, err)
+			}
+		})
+	}
+}
+
 func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")

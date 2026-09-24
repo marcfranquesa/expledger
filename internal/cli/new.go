@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
@@ -27,24 +26,15 @@ func newExperimentCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			id, err := experiment.NewID(args[0], app.now)
-			if err != nil {
-				return err
-			}
-			exists, err := catalog.Exists(app.repoRoot, id)
-			if err != nil {
-				return err
-			}
-			if exists {
-				return fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
-			}
-			for _, parent := range opts.BasedOn {
-				exists, err := catalog.Exists(app.repoRoot, parent)
+			if len(opts.BasedOn) > 0 {
+				records, err := catalog.List(app.repoRoot)
 				if err != nil {
-					return fmt.Errorf("check parent experiment %q: %w", parent, err)
+					return fmt.Errorf("validate experiment catalog: %w", err)
 				}
-				if !exists {
-					return fmt.Errorf("parent experiment %q does not exist", parent)
+				for _, parent := range opts.BasedOn {
+					if _, err := catalog.Lookup(records, parent); err != nil {
+						return fmt.Errorf("check parent experiment %q: %w", parent, err)
+					}
 				}
 			}
 			dir, err := experiment.Create(app.repoRoot, args[0], app.now, opts)

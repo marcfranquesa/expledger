@@ -7,12 +7,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 // List reads immediate experiment directories and orders records by descending ID.
+// Each README's ID must exactly match its directory name.
 // A missing experiments directory is an empty list.
 func List(root string) ([]experiment.Record, error) {
 	project, err := os.OpenRoot(root)
@@ -48,8 +49,12 @@ func List(root string) ([]experiment.Record, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", readme, err)
 		}
+		if record.ID != entry.Name() {
+			return nil, fmt.Errorf("invalid %s: YAML id %q must match folder name %q", readme, record.ID, entry.Name())
+		}
 		records = append(records, record)
 	}
-	sort.SliceStable(records, func(i, j int) bool { return records[i].ID > records[j].ID })
+	// ReadDir sorts directory names, which match the validated IDs.
+	slices.Reverse(records)
 	return records, nil
 }
