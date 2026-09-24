@@ -18,6 +18,8 @@ type application struct {
 
 // Streams connects the command and its workload to the caller's input and output.
 // Nil input is empty; nil outputs are discarded.
+// Streams remain caller-owned. Custom readers and writers must finish or unblock
+// independently of Run returning, including on cancellation; Run does not close them.
 type Streams struct {
 	In  io.Reader
 	Out io.Writer
@@ -53,11 +55,7 @@ func Run(ctx context.Context, args []string, cwd string, now time.Time, streams 
 				return err
 			}
 			var err error
-			if cmd.Name() == "run" {
-				app.repoRoot, err = runGit(cmd.Context(), cwd, "rev-parse", "--show-toplevel")
-			} else {
-				app.repoRoot, err = gitRoot(cwd)
-			}
+			app.repoRoot, err = gitRoot(cmd.Context(), cwd, cmd.Name() == "run")
 			return err
 		},
 	}

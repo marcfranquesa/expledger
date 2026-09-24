@@ -38,40 +38,43 @@ func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) (bool
 		return true, err
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// Bound Wait if a descendant retains a copied output stream after its parent exits.
+	// Bound waits for os/exec's pipes if a descendant retains an output stream.
 	cmd.WaitDelay = time.Second
 	if err := cmd.Start(); err != nil {
 		return true, fmt.Errorf("launch run.sh: %w", err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
-	publishErr := launched()
+	interruption := launched()
 	var waitErr error
-	interrupted := publishErr != nil
-	if !interrupted {
+	if interruption == nil {
 		select {
 		case waitErr = <-done:
 		case <-ctx.Done():
-			interrupted = true
+			interruption = &workloadExit{130}
 		}
 	}
-	if interrupted {
+	groupStopped := false
+	if interruption != nil {
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
 		timer := time.NewTimer(time.Second)
 		select {
 		case waitErr = <-done:
 		case <-timer.C:
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			if err := stopRunGroup(cmd.Process.Pid); err != nil {
+				return false, errors.Join(interruption, err)
+			}
+			groupStopped = true
 			waitErr = <-done
 		}
 		timer.Stop()
 	}
-	groupErr := stopRunGroup(cmd.Process.Pid)
-	if publishErr != nil {
-		return groupErr == nil, errors.Join(publishErr, groupErr)
+	var groupErr error
+	if !groupStopped {
+		groupErr = stopRunGroup(cmd.Process.Pid)
 	}
-	if interrupted {
-		return groupErr == nil, errors.Join(&workloadExit{130}, groupErr)
+	if interruption != nil {
+		return groupErr == nil, errors.Join(interruption, groupErr)
 	}
 	if waitErr != nil {
 		var exit *exec.ExitError

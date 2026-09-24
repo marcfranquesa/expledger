@@ -32,59 +32,64 @@ type Record struct {
 // Parse reads a single YAML metadata document with the supported schema.
 // Custom fields are accepted but not retained in the record.
 func Parse(data []byte) (Record, error) {
+	record, _, err := parseMetadata(data)
+	return record, err
+}
+
+func parseMetadata(data []byte) (Record, *yaml.Node, error) {
 	var node yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&node); err != nil {
-		return Record{}, fmt.Errorf("parse metadata: %w", err)
+		return Record{}, nil, fmt.Errorf("parse metadata: %w", err)
 	}
 	var trailing yaml.Node
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return Record{}, errors.New("metadata must contain exactly one YAML document")
+		return Record{}, nil, errors.New("metadata must contain exactly one YAML document")
 	}
 	if len(node.Content) != 1 || node.Content[0].Kind != yaml.MappingNode {
-		return Record{}, errors.New("metadata must be a YAML mapping")
+		return Record{}, nil, errors.New("metadata must be a YAML mapping")
 	}
 	if err := validateYAML(&node); err != nil {
-		return Record{}, err
+		return Record{}, nil, err
 	}
 	fields := node.Content[0].Content
 	for i := 0; i < len(fields); i += 2 {
 		if fields[i].Kind != yaml.ScalarNode || fields[i].Tag != "!!str" {
-			return Record{}, errors.New("metadata keys must be strings")
+			return Record{}, nil, errors.New("metadata keys must be strings")
 		}
 		key, value := fields[i].Value, fields[i+1]
 		switch key {
 		case "schema", "id", "title":
 			if value.Tag != "!!str" {
-				return Record{}, fmt.Errorf("%s must be a string", key)
+				return Record{}, nil, fmt.Errorf("%s must be a string", key)
 			}
 		case "created_at":
 			if err := validateTimestampNode(key, value); err != nil {
-				return Record{}, err
+				return Record{}, nil, err
 			}
 		case "last_run":
 			if err := validateRunReceiptNode(value); err != nil {
-				return Record{}, err
+				return Record{}, nil, err
 			}
 		case "based_on":
 			if value.Kind != yaml.SequenceNode {
-				return Record{}, errors.New("based_on must be a list of strings")
+				return Record{}, nil, errors.New("based_on must be a list of strings")
 			}
 			for _, parent := range value.Content {
 				if parent.Tag != "!!str" {
-					return Record{}, errors.New("based_on must be a list of strings")
+					return Record{}, nil, errors.New("based_on must be a list of strings")
 				}
 			}
 		}
 	}
 	var record Record
 	if err := node.Decode(&record); err != nil {
-		return Record{}, fmt.Errorf("decode metadata: %w", err)
+		return Record{}, nil, fmt.Errorf("decode metadata: %w", err)
 	}
 	if err := record.validate(); err != nil {
-		return Record{}, err
+		return Record{}, nil, err
 	}
-	return record, nil
+	return record, &node, nil
 }
 
 // Marshal encodes the record's standard fields as one YAML metadata document.

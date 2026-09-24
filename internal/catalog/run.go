@@ -57,7 +57,7 @@ func RecordRun(root, id string, receipt experiment.RunReceipt) error {
 		return fmt.Errorf("write %s: %w", metadata, err)
 	}
 
-	// Do not replace a user's edit made while the replacement was prepared.
+	// Reject edits observed while preparing the replacement.
 	currentInfo, err := project.Lstat(metadata)
 	if err != nil {
 		return fmt.Errorf("check %s before updating: %w", metadata, err)

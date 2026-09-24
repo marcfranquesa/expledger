@@ -45,9 +45,6 @@ func runExperimentCommand(app *application) *cobra.Command {
 }
 
 func runExperiment(ctx context.Context, cli *cobra.Command, root, id, ref string) (result error) {
-	if _, err := catalog.Read(root, id); err != nil {
-		return err
-	}
 	gitDir, err := runGit(ctx, root, "rev-parse", "--absolute-git-dir")
 	if err != nil {
 		return err
@@ -68,7 +65,7 @@ func runExperiment(ctx context.Context, cli *cobra.Command, root, id, ref string
 		return fmt.Errorf("lock experiment %q: %w", id, err)
 	}
 	defer func() { result = errors.Join(result, unlock()) }()
-	// Re-read under the lock: a previous invocation may have just selected a new revision.
+	// Read under the lock so a previous invocation cannot change the selected revision.
 	record, err := catalog.Read(root, id)
 	if err != nil {
 		return err
@@ -184,41 +181,6 @@ func makeRunDirectory(root *os.Root, path string) error {
 		return fmt.Errorf("runner directory %s must not be a file or symlink", path)
 	}
 	return nil
-}
-
-func runEnvironment(env []string) []string {
-	clean := make([]string, 0, len(env))
-	for _, entry := range env {
-		name, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(name, "GIT_CONFIG") {
-			continue
-		}
-		switch name {
-		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
-			"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_GRAFT_FILE",
-			"GIT_SHALLOW_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_IMPLICIT_WORK_TREE",
-			"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
-			"EXPLEDGER_PROJECT_DIR", "EXPLEDGER_OUTPUT_DIR":
-			continue
-		}
-		clean = append(clean, entry)
-	}
-	return clean
-}
-
-func runGit(ctx context.Context, cwd string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = cwd
-	cmd.Env = append(runEnvironment(cmd.Environ()), "LC_ALL=C", "GIT_NO_REPLACE_OBJECTS=1")
-	output, err := cmd.Output()
-	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return "", fmt.Errorf("git: %s: %w", strings.TrimSpace(string(exit.Stderr)), err)
-		}
-		return "", err
-	}
-	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), nil
 }
 
 type workloadExit struct{ code int }

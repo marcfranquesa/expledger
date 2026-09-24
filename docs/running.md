@@ -83,3 +83,5 @@ and Linux, interruption cancels the workload and its ordinary child processes
 before cleanup. Standard input from a pipe or file and both output streams are
 forwarded. The runner is intended for batch workloads; reading interactively
 from the terminal, interactive job control, and daemon processes are unsupported.
+Child processes must retain the workload's process group and user identity so
+ExpLedger can stop them before removing the checkout.

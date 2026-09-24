@@ -20,16 +20,14 @@ type RunReceipt struct {
 // WithRunReceipt updates only last_run in a valid metadata document.
 // Other YAML values and comments are retained, but layout may change.
 func WithRunReceipt(data []byte, receipt RunReceipt) ([]byte, error) {
-	if _, err := Parse(data); err != nil {
+	_, document, err := parseMetadata(data)
+	if err != nil {
 		return nil, err
 	}
 	if err := receipt.validate(); err != nil {
 		return nil, err
 	}
-	var document, replacement yaml.Node
-	if err := yaml.Unmarshal(data, &document); err != nil {
-		return nil, fmt.Errorf("parse metadata: %w", err)
-	}
+	var replacement yaml.Node
 	if err := replacement.Encode(receipt); err != nil {
 		return nil, fmt.Errorf("encode run receipt: %w", err)
 	}
@@ -49,8 +47,8 @@ func WithRunReceipt(data []byte, receipt RunReceipt) ([]byte, error) {
 	if !found {
 		mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "last_run"}, &replacement)
 	}
-	explicitEmptyNulls(&document)
-	updated, err := yaml.Marshal(&document)
+	explicitEmptyNulls(document)
+	updated, err := yaml.Marshal(document)
 	if err != nil {
 		return nil, fmt.Errorf("encode metadata: %w", err)
 	}

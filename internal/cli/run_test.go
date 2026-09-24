@@ -86,7 +86,7 @@ pwd > "$EXPLEDGER_OUTPUT_DIR/working-directory.txt"
 			t.Fatalf("later run removed previous output: %v", err)
 		}
 	}
-	if got := runnerGitOutput(t, root, "rev-parse", "HEAD"); got != second {
+	if got := git(t, root, "rev-parse", "HEAD"); got != second {
 		t.Fatalf("primary checkout moved to %s, want %s", got, second)
 	}
 	if got := runnerRead(t, filepath.Join(root, "source.txt")); got != "uncommitted project code\n" {
@@ -462,18 +462,7 @@ func runnerCommit(t *testing.T, root string) string {
 	t.Helper()
 	git(t, root, "add", "--all")
 	git(t, root, "commit", "--quiet", "-m", "test fixture")
-	return runnerGitOutput(t, root, "rev-parse", "HEAD")
-}
-
-func runnerGitOutput(t *testing.T, root string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = root
-	data, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, data)
-	}
-	return strings.TrimSpace(string(data))
+	return git(t, root, "rev-parse", "HEAD")
 }
 
 func runnerPath(root, name string) string {
@@ -515,7 +504,7 @@ func runnerAssertReceipt(t *testing.T, root, commit string, started time.Time) {
 
 func runnerAssertOutputPath(t *testing.T, root, output string) {
 	t.Helper()
-	gitDir := runnerGitOutput(t, root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	gitDir := git(t, root, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	wantParent := filepath.Join(gitDir, "expledger", "runs", runnerID)
 	if !filepath.IsAbs(output) || filepath.Dir(output) != wantParent {
 		t.Fatalf("output directory %q is not a child of shared Git directory %q", output, wantParent)
@@ -528,7 +517,7 @@ func runnerAssertOutputPath(t *testing.T, root, output string) {
 
 func runnerAssertWorktreeCount(t *testing.T, root string, want int) {
 	t.Helper()
-	listed := runnerGitOutput(t, root, "worktree", "list", "--porcelain")
+	listed := git(t, root, "worktree", "list", "--porcelain")
 	if got := strings.Count("\n"+listed, "\nworktree "); got != want {
 		t.Fatalf("registered worktrees = %d, want %d:\n%s", got, want, listed)
 	}
@@ -536,7 +525,7 @@ func runnerAssertWorktreeCount(t *testing.T, root string, want int) {
 
 func runnerWaitForOutput(t *testing.T, root, filename string, finished <-chan error) string {
 	t.Helper()
-	gitDir := runnerGitOutput(t, root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	gitDir := git(t, root, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	pattern := filepath.Join(gitDir, "expledger", "runs", runnerID, "*", filename)
 	deadline := time.After(5 * time.Second)
 	ticker := time.NewTicker(10 * time.Millisecond)

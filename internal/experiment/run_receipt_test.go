@@ -92,12 +92,7 @@ func TestMarshalRejectsInvalidRunReceipt(t *testing.T) {
 }
 
 func TestWithRunReceiptPreservesOtherYAMLValues(t *testing.T) {
-	for _, custom := range []string{
-		"",
-		"{0}",
-		"{nested: [{key: }, {!!null '': !!null ''}], empty_string: ''}",
-		"!future {tags: [analysis, ml], enabled: true, seed: 18446744073709551617, payload: !!binary SGVsbG8=}",
-	} {
+	for _, custom := range customMetadataValues {
 		t.Run(custom, func(t *testing.T) {
 			original := []byte("# Experiment metadata\n" + receiptMetadata + "# Custom settings\ncustom: " + custom + "\n# Preserve this trailing note\n")
 			receipt := RunReceipt{ProjectCommit: strings.Repeat("a", 40), StartedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)}

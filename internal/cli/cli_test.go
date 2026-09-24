@@ -38,25 +38,29 @@ func TestNewFromGitWorktree(t *testing.T) {
 	}
 }
 
-func TestNewOutsideGit(t *testing.T) {
-	root := t.TempDir()
-	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
-	if err == nil {
-		t.Fatal("expected error outside a Git worktree")
+func TestCommandsOutsideGit(t *testing.T) {
+	for _, command := range []string{"new", "run"} {
+		t.Run(command, func(t *testing.T) {
+			root := t.TempDir()
+			var stdout bytes.Buffer
+			err := cli.Run(context.Background(), []string{command, "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
+			if err == nil {
+				t.Fatal("expected error outside a Git worktree")
+			}
+			for _, want := range []string{root, "Git repository", "existing", "git init"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("outside-repository error %q does not contain %q", err, want)
+				}
+			}
+			if strings.Contains(err.Error(), "exit status 128") {
+				t.Errorf("outside-repository error exposes Git's exit status: %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("failed command wrote to stdout: %q", stdout.String())
+			}
+			assertEmptyDirectory(t, root)
+		})
 	}
-	for _, want := range []string{root, "Git repository", "existing", "git init"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("outside-repository error %q does not contain %q", err, want)
-		}
-	}
-	if strings.Contains(err.Error(), "exit status 128") {
-		t.Errorf("outside-repository error exposes Git's exit status: %v", err)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("failed command wrote to stdout: %q", stdout.String())
-	}
-	assertEmptyDirectory(t, root)
 }
 
 func TestNewWithoutGit(t *testing.T) {
@@ -312,13 +316,15 @@ func assertNew(t *testing.T, cwd, root string) {
 	}
 }
 
-func git(t *testing.T, cwd string, args ...string) {
+func git(t *testing.T, cwd string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := cmd.CombinedOutput()
+	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
+	return strings.TrimSpace(string(out))
 }
 
 func writeREADME(t *testing.T, root, id string, data []byte) string {
