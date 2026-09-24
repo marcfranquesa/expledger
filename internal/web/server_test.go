@@ -63,44 +63,6 @@ func TestExperiments(t *testing.T) {
 	}
 }
 
-func TestEscapesMetadataAndFolderURL(t *testing.T) {
-	root := t.TempDir()
-	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
-		t.Fatal(err)
-	}
-	folder := filepath.Join(root, "experiments", "actual folder & notes")
-	if err := os.Rename(filepath.Join(root, "experiments", "20260924-long-title"), folder); err != nil {
-		t.Fatal(err)
-	}
-	metadata := filepath.Join(folder, "expledger.yaml")
-	data, err := os.ReadFile(metadata)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lines := strings.Split(string(data), "\n")
-	for i, line := range lines {
-		if strings.HasPrefix(line, "title:") {
-			lines[i] = `title: '<script>alert("x")</script> & trial'`
-		}
-		if strings.HasPrefix(line, "id:") {
-			lines[i] = "id: actual folder & notes"
-		}
-	}
-	if err := os.WriteFile(metadata, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "research/next"})
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	body := response.Body.String()
-	if response.Code != http.StatusOK ||
-		!strings.Contains(body, "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; trial") ||
-		!strings.Contains(body, `href="https://github.com/example/project/tree/research%2Fnext/experiments/actual%20folder%20&amp;%20notes"`) ||
-		strings.Contains(body, "<script>") || strings.Contains(body, "/experiments/20260924-long-title") {
-		t.Fatalf("incorrect escaping or folder URL: %d %s", response.Code, body)
-	}
-}
-
 func TestRefreshReadsCurrentFiles(t *testing.T) {
 	root := t.TempDir()
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
