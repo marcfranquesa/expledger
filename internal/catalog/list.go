@@ -7,12 +7,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
+	"sort"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
-// List reads immediate experiment directories and orders records by descending ID.
+// List reads immediate experiment directories and orders records by creation time, newest first.
 // Each README's ID must exactly match its directory name.
 // A missing experiments directory is an empty list.
 func List(root string) ([]experiment.Record, error) {
@@ -54,7 +54,6 @@ func List(root string) ([]experiment.Record, error) {
 		}
 		records = append(records, record)
 	}
-	// ReadDir sorts directory names, which match the validated IDs.
-	slices.Reverse(records)
+	sort.SliceStable(records, func(i, j int) bool { return records[i].CreatedAt.After(records[j].CreatedAt) })
 	return records, nil
 }

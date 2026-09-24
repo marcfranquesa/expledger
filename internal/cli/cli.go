@@ -40,7 +40,7 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 	}
 	root.SetArgs(append([]string{}, args...))
 	root.SetOut(stdout)
-	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app))
+	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), serveExperimentsCommand(app))
 	return root.Execute()
 }
 

@@ -19,9 +19,9 @@ func TestListFromNestedDirectory(t *testing.T) {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeListRecord(t, root, "20260922-baseline", experiment.Record{ID: "20260922-baseline", Title: "Baseline"})
-	writeListRecord(t, root, "20260924-latest", experiment.Record{ID: "20260924-latest", Title: "Latest result"})
-	writeListRecord(t, root, "20260923-middle", experiment.Record{ID: "20260923-middle", Title: "Middle\t title\ncontinued"})
+	writeListRecord(t, root, "20260922-baseline", experiment.Record{ID: "20260922-baseline", Title: "Baseline", CreatedAt: time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)})
+	writeListRecord(t, root, "20260924-latest", experiment.Record{ID: "20260924-latest", Title: "Latest result", CreatedAt: time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC)})
+	writeListRecord(t, root, "20260923-middle", experiment.Record{ID: "20260923-middle", Title: "Middle\t title\ncontinued", CreatedAt: time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)})
 
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"list"}, cwd, time.Time{}, &stdout); err != nil {
