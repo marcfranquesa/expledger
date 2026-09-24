@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,17 @@ func Read(root, id string) (experiment.Record, error) {
 			return experiment.Record{}, fmt.Errorf("%s must be a directory, not a file or symlink", path)
 		}
 	}
-	return readRecord(project, id)
+	entries, err := fs.ReadDir(project.FS(), "experiments")
+	if err != nil {
+		return experiment.Record{}, fmt.Errorf("read experiments directory: %w", err)
+	}
+	// Path lookup can ignore case or Unicode normalization on some filesystems.
+	for _, entry := range entries {
+		if entry.Name() == id {
+			return readRecord(project, id)
+		}
+	}
+	return experiment.Record{}, fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "README.md"), os.ErrNotExist)
 }
 
 func readRecord(project *os.Root, id string) (experiment.Record, error) {
