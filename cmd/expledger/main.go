@@ -12,10 +12,10 @@ import (
 func main() {
 	cwd, err := os.Getwd()
 	if err == nil {
-		err = cli.Run(context.Background(), os.Args[1:], cwd, time.Now(), os.Stdout)
+		err = cli.Run(context.Background(), os.Args[1:], cwd, time.Now(), cli.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "expledger:", err)
-		os.Exit(1)
+		os.Exit(cli.ExitCode(err))
 	}
 }

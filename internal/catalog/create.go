@@ -74,16 +74,18 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 		}
 		return "", errors.Join(cause, fs.Remove(dir))
 	}
-	// Publish metadata last so discovery ignores an unfinished notes-only folder.
+	// Publish metadata last so discovery ignores an unfinished experiment.
 	for _, file := range []struct {
 		name string
 		data []byte
+		mode os.FileMode
 	}{
-		{"README.md", []byte(fmt.Sprintf("# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title))},
-		{"expledger.yaml", data},
+		{"README.md", []byte(fmt.Sprintf("# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)), 0644},
+		{"run.sh", []byte("#!/bin/sh\nprintf '%s\\n' 'Configure run.sh with the experiment command and fixed parameters.' >&2\nexit 1\n"), 0755},
+		{"expledger.yaml", data, 0644},
 	} {
 		path := filepath.Join(dir, file.name)
-		f, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		f, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, file.mode)
 		if err != nil {
 			return cleanup(fmt.Errorf("create %s: %w", path, err))
 		}

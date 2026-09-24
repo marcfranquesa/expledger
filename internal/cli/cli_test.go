@@ -41,7 +41,7 @@ func TestNewFromGitWorktree(t *testing.T) {
 func TestNewOutsideGit(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), &stdout)
+	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
 	if err == nil {
 		t.Fatal("expected error outside a Git worktree")
 	}
@@ -63,7 +63,7 @@ func TestNewWithoutGit(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("PATH", t.TempDir())
 	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), &stdout)
+	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
 	if !errors.Is(err, exec.ErrNotFound) {
 		t.Fatalf("missing-Git error = %v, want wrapped exec.ErrNotFound", err)
 	}
@@ -80,7 +80,7 @@ func TestNewInBareRepository(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--bare", "--quiet")
 	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), &stdout)
+	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("bare-repository error = %v, want wrapped exec.ExitError", err)
@@ -105,7 +105,7 @@ func TestNewWithInvalidGitDirectory(t *testing.T) {
 	missing := filepath.Join(root, "missing.git")
 	t.Setenv("GIT_DIR", missing)
 	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), &stdout)
+	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) {
 		t.Fatalf("invalid-GIT_DIR error = %v, want wrapped exec.ExitError", err)
@@ -139,7 +139,7 @@ func TestRootHelp(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), tt.args, root, time.Now(), &stdout); err != nil {
+			if err := cli.Run(context.Background(), tt.args, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
 				t.Fatal(err)
 			}
 			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "new") {
@@ -160,6 +160,7 @@ func TestCommandHelp(t *testing.T) {
 	}{
 		{name: "new", argument: "<slug>"},
 		{name: "validate", argument: "<id>"},
+		{name: "run", argument: "<id>", helpText: []string{"--at", "run.sh", "EXPLEDGER_OUTPUT_DIR"}},
 		{name: "list"},
 		{name: "build", helpText: []string{"--output", "dist", "index.html", "snapshot"}},
 		{name: "serve", helpText: []string{"--port", "127.0.0.1", "Ctrl+C"}},
@@ -174,7 +175,7 @@ func TestCommandHelp(t *testing.T) {
 				root := t.TempDir()
 				t.Setenv("PATH", t.TempDir())
 				var stdout bytes.Buffer
-				if err := cli.Run(context.Background(), args, root, time.Now(), &stdout); err != nil {
+				if err := cli.Run(context.Background(), args, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
 					t.Fatal(err)
 				}
 				usage := strings.TrimSpace("expledger " + command.name + " " + command.argument)
@@ -193,14 +194,14 @@ func TestRunDoesNotRetainCommandState(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, time.Now(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 
 	assertNew(t, root, root)
 
 	stdout.Reset()
-	if err := cli.Run(context.Background(), nil, root, time.Now(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), nil, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	if got := stdout.String(); !strings.Contains(got, "Available Commands:") {
@@ -229,16 +230,22 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 		{"serve", "extra"},
 		{"serve", "--port=-1"},
 		{"serve", "--port=65536"},
+		{"run"},
+		{"run", "selected", "another-id"},
+		{"run", "selected", "--", "seed=7"},
+		{"run", "selected", "--seed", "7"},
+		{"run", "selected", "--at="},
+		{"run", "selected", "--at", " \t "},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), args, root, time.Now(), &stdout)
+			err := cli.Run(context.Background(), args, root, time.Now(), cli.Streams{Out: &stdout})
 			if err == nil {
 				t.Fatalf("expected a usage error for %q", args)
 			}
-			if errors.Is(err, exec.ErrNotFound) || strings.Contains(err.Error(), "Git") {
+			if errors.Is(err, exec.ErrNotFound) || strings.Contains(err.Error(), "find Git") {
 				t.Fatalf("Git lookup ran before argument validation: %v", err)
 			}
 			if stdout.Len() != 0 {
@@ -263,7 +270,7 @@ func TestRunCanceledBeforeGitLookup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var stdout bytes.Buffer
-	if err := cli.Run(ctx, []string{"new", "my-idea"}, root, time.Now(), &stdout); !errors.Is(err, context.Canceled) {
+	if err := cli.Run(ctx, []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled Run error = %v, want context.Canceled", err)
 	}
 	if stdout.Len() != 0 {
@@ -287,7 +294,7 @@ func assertNew(t *testing.T, cwd, root string) {
 	t.Helper()
 	var stdout bytes.Buffer
 	now := time.Date(2026, time.September, 24, 23, 30, 0, 0, time.FixedZone("local", -4*60*60))
-	if err := cli.Run(context.Background(), []string{"new", "my-idea"}, cwd, now, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "my-idea"}, cwd, now, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(root)

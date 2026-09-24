@@ -1,12 +1,13 @@
 # ExpLedger
 
-ExpLedger records coding experiments as folders with `expledger.yaml` metadata
-and independent Markdown notes in your Git repository.
+ExpLedger records coding experiments as folders in your Git repository and runs
+them against a recorded project revision.
 
 ```text
 experiments/20260924-baseline/
 ├── expledger.yaml
 ├── README.md
+├── run.sh
 └── ... supporting files
 ```
 
@@ -14,7 +15,8 @@ ExpLedger discovers only folders containing `expledger.yaml` with
 `schema: expledger/v1`.
 
 The [record format](docs/format.md) defines metadata, parent references, and
-filesystem rules for hand-written records and integrations.
+filesystem rules. The [running guide](docs/running.md) covers entrypoints,
+project revisions, and persistent outputs.
 
 ExpLedger is in active development. Expect breaking changes.
 
@@ -22,7 +24,8 @@ ExpLedger is in active development. Expect breaking changes.
 
 | Name | Description |
 | --- | --- |
-| `expledger new <slug> [flags]` | Create a dated experiment folder with `expledger.yaml` and `README.md`. |
+| `expledger new <slug> [flags]` | Create a dated folder with metadata, notes, and an executable `run.sh` stub. |
+| `expledger run <id> [--at <ref>]` | Run the current experiment against the selected or last recorded project commit. |
 | `expledger list` | List experiment IDs and titles, newest first. |
 | `expledger validate <id>` | Validate an experiment's `expledger.yaml` and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
@@ -31,6 +34,24 @@ ExpLedger is in active development. Expect breaking changes.
 
 `build` and `serve` work in local-only repositories and detached worktrees.
 Remote links appear when `origin` points to GitHub and a branch is checked out.
+
+## Run an experiment
+
+Create a record, then replace its generated `run.sh` stub with the experiment's
+commands. Keep parameters in `run.sh` or files beside it; `run` accepts no
+workload arguments.
+
+```sh
+expledger new baseline --title "Baseline model"
+# Edit experiments/<id>/run.sh and its supporting files.
+expledger run <id> --at main
+expledger run <id>
+```
+
+The first run requires `--at`. Later runs reuse the recorded project commit,
+even after rebasing or merging. Use `--at main` again to select a newer revision.
+The current experiment definition runs in a temporary checkout; write durable
+results to `EXPLEDGER_OUTPUT_DIR`, whose path is printed to stderr.
 
 ## Installation
 

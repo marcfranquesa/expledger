@@ -57,7 +57,7 @@ func TestServeStartsAndStops(t *testing.T) {
 			defer cancel()
 			output := make(startupOutput, 2)
 			finished := make(chan error, 1)
-			go func() { finished <- Run(ctx, []string{"serve", "--port=0"}, root, time.Time{}, output) }()
+			go func() { finished <- Run(ctx, []string{"serve", "--port=0"}, root, time.Time{}, Streams{Out: output}) }()
 			var address string
 			select {
 			case text := <-output:

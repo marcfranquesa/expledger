@@ -14,18 +14,19 @@ import (
 )
 
 // time.Parse also accepts single-digit hours, comma fractions, and out-of-range offsets.
-var createdAtPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
+var timestampPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
 
 // Schema identifies the supported ExpLedger metadata format.
 const Schema = "expledger/v1"
 
 // Record holds an experiment's structured metadata.
 type Record struct {
-	Schema    string    `yaml:"schema"`
-	ID        string    `yaml:"id"`
-	Title     string    `yaml:"title"`
-	CreatedAt time.Time `yaml:"created_at"`
-	BasedOn   []string  `yaml:"based_on,omitempty"`
+	Schema    string      `yaml:"schema"`
+	ID        string      `yaml:"id"`
+	Title     string      `yaml:"title"`
+	CreatedAt time.Time   `yaml:"created_at"`
+	BasedOn   []string    `yaml:"based_on,omitempty"`
+	LastRun   *RunReceipt `yaml:"last_run,omitempty"`
 }
 
 // Parse reads a single YAML metadata document with the supported schema.
@@ -58,11 +59,12 @@ func Parse(data []byte) (Record, error) {
 				return Record{}, fmt.Errorf("%s must be a string", key)
 			}
 		case "created_at":
-			if value.Kind != yaml.ScalarNode || (value.Tag != "!!str" && value.Tag != "!!timestamp") {
-				return Record{}, errors.New("created_at must be an RFC3339 timestamp with a timezone")
+			if err := validateTimestampNode(key, value); err != nil {
+				return Record{}, err
 			}
-			if _, err := time.Parse(time.RFC3339Nano, value.Value); err != nil || !createdAtPattern.MatchString(value.Value) {
-				return Record{}, fmt.Errorf("created_at must be an RFC3339 timestamp with a timezone (for example, 2026-09-24T14:30:00Z); got %q", value.Value)
+		case "last_run":
+			if err := validateRunReceiptNode(value); err != nil {
+				return Record{}, err
 			}
 		case "based_on":
 			if value.Kind != yaml.SequenceNode {
@@ -110,19 +112,41 @@ func (r Record) validate() error {
 	if strings.TrimSpace(r.Title) == "" {
 		return errors.New("title is required and must be a nonempty string")
 	}
-	if r.CreatedAt.IsZero() {
-		return errors.New("created_at is required and must be a nonzero RFC3339 timestamp with a timezone")
+	if err := validateTimestamp("created_at", r.CreatedAt); err != nil {
+		return err
 	}
-	if _, err := r.CreatedAt.MarshalText(); err != nil {
-		return fmt.Errorf("created_at must be an RFC3339 timestamp with a timezone: %w", err)
-	}
-	if _, offset := r.CreatedAt.Zone(); offset%60 != 0 {
-		return errors.New("created_at timezone offset must be a whole number of minutes")
+	if r.LastRun != nil {
+		if err := r.LastRun.validate(); err != nil {
+			return err
+		}
 	}
 	for _, parent := range r.BasedOn {
 		if strings.TrimSpace(parent) == "" {
 			return errors.New("based_on entries must be nonempty strings")
 		}
+	}
+	return nil
+}
+
+func validateTimestampNode(name string, node *yaml.Node) error {
+	if node.Kind != yaml.ScalarNode || (node.Tag != "!!str" && node.Tag != "!!timestamp") {
+		return fmt.Errorf("%s must be an RFC3339 timestamp with a timezone", name)
+	}
+	if _, err := time.Parse(time.RFC3339Nano, node.Value); err != nil || !timestampPattern.MatchString(node.Value) {
+		return fmt.Errorf("%s must be an RFC3339 timestamp with a timezone (for example, 2026-09-24T14:30:00Z); got %q", name, node.Value)
+	}
+	return nil
+}
+
+func validateTimestamp(name string, value time.Time) error {
+	if value.IsZero() {
+		return fmt.Errorf("%s is required and must be a nonzero RFC3339 timestamp with a timezone", name)
+	}
+	if _, err := value.MarshalText(); err != nil {
+		return fmt.Errorf("%s must be an RFC3339 timestamp with a timezone: %w", name, err)
+	}
+	if _, offset := value.Zone(); offset%60 != 0 {
+		return fmt.Errorf("%s timezone offset must be a whole number of minutes", name)
 	}
 	return nil
 }

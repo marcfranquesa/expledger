@@ -3,7 +3,8 @@
 Each experiment has `experiments/<id>/expledger.yaml` under the Git working
 tree root. This file is the sole source of ExpLedger metadata. `README.md` holds
 independent notes; other files can hold scripts, artifacts, or another tool's
-metadata. A README is created by `new` but is not required for catalog reads.
+metadata. `new` creates a README and an executable `run.sh` stub; neither file is
+required for catalog reads.
 
 ```yaml
 schema: expledger/v1
@@ -26,13 +27,35 @@ another tool's front matter, are never parsed or updated by ExpLedger.
 | `title` | Required nonblank string. It does not determine the ID or folder name. |
 | `created_at` | Required nonzero RFC3339 timestamp with a timezone, such as `2026-09-24T12:00:00Z` or `2026-09-24T08:00:00-04:00`. Quoted timestamps are accepted. |
 | `based_on` | Optional list of nonblank strings naming direct parent experiments. |
-| Other keys | Custom metadata with string keys; accepted but not used by ExpLedger. |
+| `last_run` | Optional mapping with `project_commit` and `started_at`, recording the latest launched entrypoint. See below. |
+| Other keys | Custom metadata with string keys; accepted but not used by ExpLedger, and preserved when recording a run. |
 
 Timestamp precision is nanoseconds. Additional fractional-second digits are
 truncated when read. Re-encoding preserves the represented instant and supported
 timezone offset; offsets must be whole minutes and within RFC3339's range.
 The zero timestamp `0001-01-01T00:00:00Z` is rejected. YAML aliases and merge keys
 are unsupported, including within custom metadata.
+
+## Run receipt
+
+`last_run.project_commit` is a full Git commit ID: 40 or 64 lowercase hexadecimal
+characters. `last_run.started_at` is a nonzero RFC3339 timestamp with a timezone,
+using the same timestamp rules as `created_at`.
+Both fields are required when `last_run` is present; null and additional receipt
+fields are rejected.
+
+```yaml
+last_run:
+  project_commit: 0123456789abcdef0123456789abcdef01234567
+  started_at: 2026-09-24T14:30:00Z
+```
+
+`run` updates this receipt when the entrypoint actually launches, including runs
+that later fail or are interrupted. A failure before launch leaves the previous
+receipt unchanged. The receipt records no outcome or run history; it does not
+assert that the experiment succeeded. Rebases and merges never remap its commit.
+An experiment without a receipt remains valid and needs an explicit `--at` for
+its first run. See [running experiments](running.md) for execution semantics.
 
 ## IDs and creation
 
@@ -45,7 +68,8 @@ Unicode are supported. An ID must be one nonblank directory name: `.`, `..`,
 slashes, backslashes, and NUL bytes are rejected. The YAML ID must equal the
 actual directory entry, even on a case-insensitive filesystem.
 
-Creation writes a plain Markdown notes template and the YAML metadata file.
+Creation writes a plain Markdown notes template, the YAML metadata file, and an
+executable `run.sh` stub that exits with an error until replaced with a workload.
 It never overwrites an existing experiment path. An occupied directory,
 file, or symlink is an error. Invalid metadata and parent references are rejected
 before creating the child. An omitted title is derived from the slug;
@@ -77,12 +101,15 @@ The `experiments` directory and directly requested experiment directories must
 be real directories. Metadata must resolve to a regular file. Relative metadata
 symlinks that stay within the project root are readable; absolute links and paths
 that escape the root are rejected.
+Running requires a regular metadata file and rejects symlinks and special files
+anywhere in the selected experiment definition.
 
-ExpLedger writes metadata only when creating a new experiment. Existing metadata
-files, including custom fields and comments, are left untouched. The internal
-record codec retains only the standard fields listed above.
+The internal record codec retains only the standard fields listed above. The
+run receipt writer updates `last_run` in the original YAML document, preserving
+unrelated custom values and types. Re-encoding may change YAML formatting; exact
+original layout is not guaranteed. Catalog reads do not modify metadata.
 
 The internal packages keep these boundaries: `experiment` owns the record and
-codec; `catalog` owns reading, discovery, and creation; `web` owns rendering and
-HTTP handling; `cli` owns command orchestration and Git context. Records remain
-ordinary files; no separate index or database is required.
+codec; `catalog` owns reading, discovery, creation, and receipt updates; `web` owns
+rendering and HTTP handling; `cli` owns command orchestration and Git context.
+Records remain ordinary files; no separate index or database is required.
