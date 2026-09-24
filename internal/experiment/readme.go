@@ -93,6 +93,11 @@ func (r Record) Marshal() ([]byte, error) {
 	if err := r.validate(); err != nil {
 		return nil, err
 	}
+	extra := make(map[string]yaml.Node, len(r.Extra))
+	for key, node := range r.Extra {
+		extra[key] = withExplicitNulls(node)
+	}
+	r.Extra = extra
 	metadata, err := yaml.Marshal(r)
 	if err != nil {
 		return nil, fmt.Errorf("encode metadata: %w", err)
@@ -100,6 +105,22 @@ func (r Record) Marshal() ([]byte, error) {
 	data := append([]byte("---\n"), metadata...)
 	data = append(data, []byte("---\n")...)
 	return append(data, r.Body...), nil
+}
+
+func withExplicitNulls(node yaml.Node) yaml.Node {
+	// yaml.v3 otherwise emits empty nulls in flow collections as empty strings.
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" && node.Value == "" {
+		node.Style |= yaml.TaggedStyle
+	}
+	if node.Content != nil {
+		content := make([]*yaml.Node, len(node.Content))
+		for i, child := range node.Content {
+			copy := withExplicitNulls(*child)
+			content[i] = &copy
+		}
+		node.Content = content
+	}
+	return node
 }
 
 func (r Record) validate() error {
@@ -111,6 +132,12 @@ func (r Record) validate() error {
 	}
 	if r.CreatedAt.IsZero() {
 		return errors.New("created_at is required and must be a nonzero RFC3339 timestamp with a timezone")
+	}
+	if _, err := r.CreatedAt.MarshalText(); err != nil {
+		return fmt.Errorf("created_at must be an RFC3339 timestamp with a timezone: %w", err)
+	}
+	if _, offset := r.CreatedAt.Zone(); offset%60 != 0 {
+		return errors.New("created_at timezone offset must be a whole number of minutes")
 	}
 	for _, parent := range r.BasedOn {
 		if strings.TrimSpace(parent) == "" {
