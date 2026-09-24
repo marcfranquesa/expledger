@@ -154,9 +154,15 @@ func TestRootHelp(t *testing.T) {
 }
 
 func TestCommandHelp(t *testing.T) {
-	for _, command := range []struct{ name, argument string }{
-		{"new", "<slug>"},
-		{"validate", "<id>"},
+	for _, command := range []struct {
+		name, argument string
+		helpText       []string
+	}{
+		{name: "new", argument: "<slug>"},
+		{name: "validate", argument: "<id>"},
+		{name: "list"},
+		{name: "build", helpText: []string{"--output", "dist", "index.html", "snapshot"}},
+		{name: "serve", helpText: []string{"--port", "127.0.0.1", "Ctrl+C"}},
 	} {
 		for _, args := range [][]string{
 			{"help", command.name},
@@ -171,41 +177,15 @@ func TestCommandHelp(t *testing.T) {
 				if err := cli.Run(context.Background(), args, root, time.Now(), &stdout); err != nil {
 					t.Fatal(err)
 				}
-				if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger "+command.name+" "+command.argument) {
-					t.Fatalf("help does not describe command usage: %q", got)
+				usage := strings.TrimSpace("expledger " + command.name + " " + command.argument)
+				for _, want := range append([]string{"Usage:", usage}, command.helpText...) {
+					if !strings.Contains(stdout.String(), want) {
+						t.Errorf("help missing %q: %s", want, stdout.String())
+					}
 				}
 				assertEmptyDirectory(t, root)
 			})
 		}
-	}
-}
-
-func TestInvalidArguments(t *testing.T) {
-	for _, tt := range []struct {
-		name string
-		args []string
-	}{
-		{name: "unknown command", args: []string{"unknown"}},
-		{name: "unknown root flag", args: []string{"--unknown"}},
-		{name: "unknown new flag", args: []string{"new", "my-idea", "--unknown"}},
-		{name: "missing slug", args: []string{"new"}},
-		{name: "extra slug", args: []string{"new", "my-idea", "another-idea"}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
-			git(t, root, "init", "--quiet")
-			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), tt.args, root, time.Now(), &stdout); err == nil {
-				t.Fatalf("expected error for arguments %q", tt.args)
-			}
-			entries, err := os.ReadDir(root)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(entries) != 1 || entries[0].Name() != ".git" {
-				t.Fatalf("invalid command unexpectedly created files: %v", entries)
-			}
-		})
 	}
 }
 
@@ -240,6 +220,15 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 		{"validate"},
 		{"validate", "selected", "another-id"},
 		{"validate", "selected", "--unknown"},
+		{"list", "extra"},
+		{"list", "--unknown"},
+		{"build", "extra"},
+		{"build", "--output="},
+		{"build", "--output"},
+		{"build", "--unknown"},
+		{"serve", "extra"},
+		{"serve", "--port=-1"},
+		{"serve", "--port=65536"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			root := t.TempDir()
@@ -249,7 +238,7 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 			if err == nil {
 				t.Fatalf("expected a usage error for %q", args)
 			}
-			if strings.Contains(err.Error(), "find Git working tree") {
+			if errors.Is(err, exec.ErrNotFound) || strings.Contains(err.Error(), "Git") {
 				t.Fatalf("Git lookup ran before argument validation: %v", err)
 			}
 			if stdout.Len() != 0 {
