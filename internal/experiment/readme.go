@@ -5,18 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
 )
 
+// time.Parse also accepts single-digit hours, comma fractions, and out-of-range offsets.
+var createdAtPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
+
 // Record holds structured metadata and the unchanged Markdown body.
 // Extra retains metadata fields added by people or later versions of ExpLedger.
 type Record struct {
 	ID        string               `yaml:"id"`
 	Title     string               `yaml:"title"`
-	CreatedAt time.Time            `yaml:"created_at,omitempty"`
+	CreatedAt time.Time            `yaml:"created_at"`
 	BasedOn   []string             `yaml:"based_on,omitempty"`
 	Extra     map[string]yaml.Node `yaml:",inline"`
 	Body      []byte               `yaml:"-"`
@@ -58,8 +62,8 @@ func Parse(data []byte) (Record, error) {
 			if value.Kind != yaml.ScalarNode || (value.Tag != "!!str" && value.Tag != "!!timestamp") {
 				return Record{}, errors.New("created_at must be an RFC3339 timestamp with a timezone")
 			}
-			if _, err := time.Parse(time.RFC3339Nano, value.Value); err != nil {
-				return Record{}, fmt.Errorf("invalid created_at: %w", err)
+			if _, err := time.Parse(time.RFC3339Nano, value.Value); err != nil || !createdAtPattern.MatchString(value.Value) {
+				return Record{}, fmt.Errorf("created_at must be an RFC3339 timestamp with a timezone (for example, 2026-09-24T14:30:00Z); got %q", value.Value)
 			}
 		case "based_on":
 			if value.Kind != yaml.SequenceNode {
@@ -99,8 +103,14 @@ func (r Record) Marshal() ([]byte, error) {
 }
 
 func (r Record) validate() error {
-	if strings.TrimSpace(r.ID) == "" || strings.TrimSpace(r.Title) == "" {
-		return errors.New("metadata requires nonempty id and title strings")
+	if strings.TrimSpace(r.ID) == "" {
+		return errors.New("id is required and must be a nonempty string")
+	}
+	if strings.TrimSpace(r.Title) == "" {
+		return errors.New("title is required and must be a nonempty string")
+	}
+	if r.CreatedAt.IsZero() {
+		return errors.New("created_at is required and must be a nonzero RFC3339 timestamp with a timezone")
 	}
 	for _, parent := range r.BasedOn {
 		if strings.TrimSpace(parent) == "" {

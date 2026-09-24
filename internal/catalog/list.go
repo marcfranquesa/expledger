@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
@@ -40,17 +39,9 @@ func List(root string) ([]experiment.Record, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		readme := filepath.Join("experiments", entry.Name(), "README.md")
-		data, err := project.ReadFile(readme)
+		record, err := readRecord(project, entry.Name())
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", readme, err)
-		}
-		record, err := experiment.Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", readme, err)
-		}
-		if record.ID != entry.Name() {
-			return nil, fmt.Errorf("invalid %s: YAML id %q must match folder name %q", readme, record.ID, entry.Name())
+			return nil, err
 		}
 		records = append(records, record)
 	}

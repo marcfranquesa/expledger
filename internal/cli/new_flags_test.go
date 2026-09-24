@@ -158,8 +158,8 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 		readme string
 	}{
 		{name: "missing README"},
-		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Baseline\n---\n\nOriginal research notes.\n"},
-		{name: "mismatched ID", readme: "---\nid: 20260920-other\ntitle: Baseline\n---\n\nOriginal research notes.\n"},
+		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
+		{name: "mismatched ID", readme: "---\nid: 20260920-other\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -212,8 +212,8 @@ func TestNewValidatesCatalogOnlyWithParents(t *testing.T) {
 		name   string
 		readme string
 	}{
-		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\n---\n"},
-		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\n---\n"},
+		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
+		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -271,6 +271,23 @@ func TestNewRejectsExistingExperiment(t *testing.T) {
 	data, err := os.ReadFile(readme)
 	if err != nil || !bytes.Equal(data, notes) {
 		t.Fatalf("duplicate changed existing notes: data=%q, err=%v", data, err)
+	}
+}
+
+func TestNewDoesNotValidateAncestors(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	const parent = "20260920-baseline"
+	now := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
+	if _, err := experiment.Create(root, "baseline", now, experiment.CreateOptions{BasedOn: []string{"20260919-missing"}}); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	if err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
+		t.Fatalf("valid direct parent was rejected: %v", err)
+	}
+	if got := readNewRecord(t, root, "my-idea").BasedOn; !reflect.DeepEqual(got, []string{parent}) {
+		t.Fatalf("based_on = %v, want [%s]", got, parent)
 	}
 }
 

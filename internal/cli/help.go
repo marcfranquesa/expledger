@@ -21,6 +21,13 @@ Display IDs and titles by created_at, newest first.
 Each README's YAML id must exactly match its experiment folder name.
 Report missing or invalid experiment READMEs with their file path.`
 
+const validateDescription = "Validate an experiment README"
+
+const validateDetails = `Check experiments/<id>/README.md at the Git working tree root.
+Validate YAML front matter, including required id, title, and created_at fields.
+The YAML id must match the experiment folder name. Markdown is unrestricted.
+Report the first error with its file path; no files are changed.`
+
 const buildDescription = "Build a static experiment web page"
 
 const buildDetails = `Write a self-contained index.html snapshot, newest experiments first.

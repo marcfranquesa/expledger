@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,49 +72,48 @@ func TestCreatedAtRoundTrip(t *testing.T) {
 	}
 }
 
-func TestLegacyRecordOmitsCreatedAt(t *testing.T) {
-	data := []byte("---\nid: example\ntitle: Example\n---\n\n# Existing notes\n")
-	record, err := Parse(data)
-	if err != nil {
-		t.Fatal(err)
+func TestParseAndMarshalRequireCreatedAt(t *testing.T) {
+	for _, field := range []string{"", "created_at: 0001-01-01T00:00:00Z\n"} {
+		data := []byte("---\nid: example\ntitle: Example\n" + field + "---\n\n# Existing notes\n")
+		if _, err := Parse(data); err == nil || !strings.Contains(err.Error(), "created_at is required") {
+			t.Fatalf("Parse error = %v, want missing or zero created_at error", err)
+		}
 	}
-	if !record.CreatedAt.IsZero() {
-		t.Fatalf("legacy record timestamp = %s, want zero", record.CreatedAt)
-	}
-	encoded, err := record.Marshal()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(encoded, data) {
-		t.Fatalf("legacy record changed: got=%q, want=%q", encoded, data)
+	record := Record{ID: "example", Title: "Example"}
+	if _, err := record.Marshal(); err == nil || !strings.Contains(err.Error(), "created_at is required") {
+		t.Fatalf("Marshal error = %v, want missing created_at error", err)
 	}
 }
 
 func TestParseRejectsInvalidCreatedAt(t *testing.T) {
 	for name, value := range map[string]string{
-		"malformed":        "yesterday",
-		"null":             "null",
-		"empty":            "",
-		"date only":        "2026-09-24",
-		"missing timezone": "2026-09-24T23:59:00",
-		"numeric":          "42",
-		"sequence":         "[2026-09-24T23:59:00Z]",
-		"mapping":          "{time: 2026-09-24T23:59:00Z}",
+		"malformed":                  "yesterday",
+		"null":                       "null",
+		"empty":                      "",
+		"date only":                  "2026-09-24",
+		"missing timezone":           "2026-09-24T23:59:00",
+		"single-digit hour":          "'2026-09-24T4:30:00Z'",
+		"comma fraction":             "'2026-09-24T14:30:00,5Z'",
+		"offset hour out of range":   "'2026-09-24T14:30:00+24:00'",
+		"offset minute out of range": "'2026-09-24T14:30:00+00:60'",
+		"numeric":                    "42",
+		"sequence":                   "[2026-09-24T23:59:00Z]",
+		"mapping":                    "{time: 2026-09-24T23:59:00Z}",
 	} {
 		t.Run(name, func(t *testing.T) {
 			data := []byte("---\nid: example\ntitle: Example\ncreated_at: " + value + "\n---\n")
-			if _, err := Parse(data); err == nil {
-				t.Fatal("invalid created_at accepted")
+			if _, err := Parse(data); err == nil || !strings.Contains(err.Error(), "created_at must be an RFC3339 timestamp with a timezone") {
+				t.Fatalf("error = %v, want created_at format error", err)
 			}
 		})
 	}
 }
 
 func TestMarshalRejectsCreatedAtInExtra(t *testing.T) {
-	record := Record{ID: "example", Title: "Example", Extra: map[string]yaml.Node{
+	record := Record{ID: "example", Title: "Example", CreatedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC), Extra: map[string]yaml.Node{
 		"created_at": {Kind: yaml.ScalarNode, Tag: "!!str", Value: "2026-09-24T23:59:00Z"},
 	}}
-	if _, err := record.Marshal(); err == nil {
-		t.Fatal("created_at override in extra metadata accepted")
+	if _, err := record.Marshal(); err == nil || !strings.Contains(err.Error(), "extra metadata cannot override created_at") {
+		t.Fatalf("error = %v, want reserved created_at error", err)
 	}
 }

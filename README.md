@@ -8,6 +8,7 @@ ExpLedger records coding experiments as folders with YAML metadata and Markdown 
 | --- | --- |
 | `expledger new <slug> [flags]` | Create a dated experiment folder and README. |
 | `expledger list` | List experiment IDs and titles, newest first. |
+| `expledger validate <id>` | Validate an experiment's README and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
 | `expledger serve [--port <port>]` | Browse experiments locally with links to their GitHub folders. |
 | `expledger help [command]` | Show help and available flags. |

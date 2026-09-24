@@ -85,7 +85,7 @@ func TestListEmpty(t *testing.T) {
 
 func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 	root := t.TempDir()
-	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n")
+	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n")
 	writeListREADME(t, root, filepath.Join("20260920-baseline", "artifacts"), "not experiment metadata")
 	if err := os.WriteFile(filepath.Join(root, "experiments", "README.md"), []byte("loose notes"), 0644); err != nil {
 		t.Fatal(err)
@@ -100,10 +100,10 @@ func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 }
 
 func TestListInvalidREADME(t *testing.T) {
-	for _, content := range []string{"", "not front matter", "---\nid: missing-title\n---\n"} {
+	for _, content := range []string{"", "not front matter", "---\nid: missing-title\ncreated_at: 2026-09-24T12:00:00Z\n---\n"} {
 		t.Run(content, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Baseline\n---\n")
+			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
 			if content == "" {
 				if err := os.Mkdir(filepath.Join(root, "experiments", "z-invalid"), 0755); err != nil {
 					t.Fatal(err)
@@ -150,7 +150,7 @@ func TestListRejectsREADMEOutsideProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	target := filepath.Join(outside, "README.md")
-	if err := os.WriteFile(target, []byte("---\nid: outside\ntitle: Outside\n---\n"), 0644); err != nil {
+	if err := os.WriteFile(target, []byte("---\nid: outside\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n---\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, filepath.Join(path, "README.md")); err != nil {
@@ -165,9 +165,9 @@ func TestListRejectsMismatchedIDs(t *testing.T) {
 	for _, id := range []string{"different", "Z-folder", "z-folder ", "a-valid"} {
 		t.Run(id, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\n---\n")
+			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
 			// Reusing a-valid also checks duplicate metadata in different folders.
-			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\n---\n# Keep these notes\n", id)
+			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n# Keep these notes\n", id)
 			writeListREADME(t, root, "z-folder", content)
 			readme := filepath.Join("experiments", "z-folder", "README.md")
 			records, err := List(root)
