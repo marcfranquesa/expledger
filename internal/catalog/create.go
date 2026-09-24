@@ -34,10 +34,9 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 		title = strings.ToUpper(title[:1]) + title[1:]
 	}
 	record := experiment.Record{
-		ID: id, Title: title,
+		Schema: experiment.Schema, ID: id, Title: title,
 		CreatedAt: now.UTC(),
 		BasedOn:   opts.BasedOn,
-		Body:      []byte(fmt.Sprintf("\n# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)),
 	}
 	data, err := record.Marshal()
 	if err != nil {
@@ -68,14 +67,31 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	if err := fs.Mkdir(dir, 0755); err != nil {
 		return "", fmt.Errorf("create experiment %s: %w", id, err)
 	}
-	readme := filepath.Join(dir, "README.md")
-	f, err := fs.OpenFile(readme, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		return "", errors.Join(fmt.Errorf("create README: %w", err), fs.Remove(dir))
+	var created []string
+	cleanup := func(cause error) (string, error) {
+		for _, path := range created {
+			cause = errors.Join(cause, fs.Remove(path))
+		}
+		return "", errors.Join(cause, fs.Remove(dir))
 	}
-	_, writeErr := f.Write(data)
-	if err := errors.Join(writeErr, f.Close()); err != nil {
-		return "", errors.Join(fmt.Errorf("write README: %w", err), fs.Remove(readme), fs.Remove(dir))
+	// Publish metadata last so discovery ignores an unfinished notes-only folder.
+	for _, file := range []struct {
+		name string
+		data []byte
+	}{
+		{"README.md", []byte(fmt.Sprintf("# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title))},
+		{"expledger.yaml", data},
+	} {
+		path := filepath.Join(dir, file.name)
+		f, err := fs.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+		if err != nil {
+			return cleanup(fmt.Errorf("create %s: %w", path, err))
+		}
+		created = append(created, path)
+		_, writeErr := f.Write(file.data)
+		if err := errors.Join(writeErr, f.Close()); err != nil {
+			return cleanup(fmt.Errorf("write %s: %w", path, err))
+		}
 	}
 	return filepath.Join(root, dir), nil
 }

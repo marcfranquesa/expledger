@@ -2,13 +2,14 @@ package cli
 
 const rootDescription = "Manage experiment records in a Git repository"
 
-const newDescription = "Create an experiment folder and README"
+const newDescription = "Create an experiment folder, metadata, and README"
 
-const newDetails = `Create experiments/YYYYMMDD-<slug>/README.md at the Git working tree root.
+const newDetails = `Create expledger.yaml and README.md in experiments/YYYYMMDD-<slug>/ at the
+Git working tree root.
 The date uses your local time. Slugs contain lowercase letters, digits, and
 single hyphens between words. Existing experiments are never overwritten.
 Validate only the direct parents named by --based-on. Each must have a valid
-README whose YAML id exactly matches its experiment folder name.`
+expledger.yaml whose id exactly matches its experiment folder name.`
 
 const newExample = `  expledger new my-idea
   expledger new my-idea --title "My experiment" --based-on 20260920-baseline
@@ -16,16 +17,16 @@ const newExample = `  expledger new my-idea
 
 const listDescription = "List experiment IDs and titles"
 
-const listDetails = `Read experiments/*/README.md at the Git working tree root.
+const listDetails = `Read experiments/*/expledger.yaml at the Git working tree root.
 Display IDs and titles by created_at, newest first.
-Each README's YAML id must exactly match its experiment folder name.
-Report missing or invalid experiment READMEs with their file path.`
+Each YAML id must exactly match its experiment folder name.
+Ignore directories without expledger.yaml. Report invalid metadata with its path.`
 
-const validateDescription = "Validate an experiment README"
+const validateDescription = "Validate experiment metadata"
 
-const validateDetails = `Check experiments/<id>/README.md at the Git working tree root.
-Validate YAML front matter, including required id, title, and created_at fields.
-The YAML id must match the experiment folder name. Markdown is unrestricted.
+const validateDetails = `Check experiments/<id>/expledger.yaml at the Git working tree root.
+Require schema: expledger/v1 and valid id, title, and created_at fields.
+The YAML id must match the experiment folder name. README.md is independent.
 Report the first error with its file path; no files are changed.`
 
 const buildDescription = "Build a static experiment web page"

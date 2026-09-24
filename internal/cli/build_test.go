@@ -62,12 +62,12 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("keep me"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	readme := filepath.Join(root, "experiments", "20260924-baseline", "README.md")
-	data, err := os.ReadFile(readme)
+	metadata := filepath.Join(root, "experiments", "20260924-baseline", "expledger.yaml")
+	data, err := os.ReadFile(metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(readme, bytes.Replace(data, []byte("Baseline model"), []byte("Updated baseline"), 1), 0o644); err != nil {
+	if err := os.WriteFile(metadata, bytes.Replace(data, []byte("Baseline model"), []byte("Updated baseline"), 1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	response := httptest.NewRecorder()
@@ -91,11 +91,11 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatalf("build modified another output file: %q, %v", data, err)
 	}
 
-	if err := os.WriteFile(readme, []byte("invalid README"), 0o644); err != nil {
+	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, &stdout); err == nil || !strings.Contains(err.Error(), "README.md") {
+	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, &stdout); err == nil || !strings.Contains(err.Error(), "expledger.yaml") {
 		t.Fatalf("invalid catalog error = %v", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, snapshot) || stdout.Len() != 0 {

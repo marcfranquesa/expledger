@@ -47,7 +47,7 @@ func TestListFromNestedDirectory(t *testing.T) {
 func TestListNormalizesWhitespace(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	writeListRecord(t, root, "20260924-record", experiment.Record{ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
+	writeListRecord(t, root, "20260924-record", experiment.Record{Schema: experiment.Schema, ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
@@ -89,50 +89,62 @@ func TestListEmpty(t *testing.T) {
 	}
 }
 
-func TestListInvalidReadme(t *testing.T) {
-	for _, malformed := range []bool{false, true} {
-		name := "missing README"
-		if malformed {
-			name = "malformed README"
+func TestListInvalidMetadata(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	writeListRecord(t, root, "20260924-valid", experiment.Record{Schema: experiment.Schema, ID: "20260924-valid", Title: "Valid", CreatedAt: metadataTestTime()})
+	writeMetadata(t, root, "z-invalid", []byte("schema: expledger/v1\nid: [invalid]\ntitle: Invalid\ncreated_at: 2026-09-24T12:00:00Z\n"))
+	var stdout bytes.Buffer
+	err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout)
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("z-invalid", "expledger.yaml")) {
+		t.Fatalf("expected invalid metadata path in error, got %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("failed list printed partial output: %q", stdout.String())
+	}
+}
+
+func TestListCoexistsWithOtherTools(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	const id = "20260924-shared"
+	writeListRecord(t, root, id, experiment.Record{Schema: experiment.Schema, ID: id, Title: "ExpLedger title", CreatedAt: metadataTestTime()})
+	const readmeContent = "---\nlabexp:\n  run_id: abc123\n  title: LabExp title\n---\n# Shared experiment notes\n"
+	readme := writeREADME(t, root, id, []byte(readmeContent))
+	const otherContent = "---\nid: 20260924-other\ntitle: Other tool's experiment\ncreated_at: 2026-09-24T13:00:00Z\n---\n# Unrelated notes\n"
+	otherReadme := writeREADME(t, root, "20260924-other", []byte(otherContent))
+	if err := os.Mkdir(filepath.Join(root, "experiments", "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
+	if len(lines) != 2 || strings.Join(strings.Fields(lines[1]), " ") != id+" ExpLedger title" {
+		t.Fatalf("list discovered other tools' records or metadata: %q", stdout.String())
+	}
+	for path, want := range map[string]string{readme: readmeContent, otherReadme: otherContent} {
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != want {
+			t.Fatalf("list changed README %s: data=%q, err=%v", path, data, err)
 		}
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			git(t, root, "init", "--quiet")
-			writeListRecord(t, root, "20260924-valid", experiment.Record{ID: "20260924-valid", Title: "Valid", CreatedAt: metadataTestTime()})
-			dir := filepath.Join(root, "experiments", "z-invalid")
-			if err := os.Mkdir(dir, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if malformed {
-				if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("---\nid: [invalid]\ntitle: Invalid\ncreated_at: 2026-09-24T12:00:00Z\n---\n"), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("z-invalid", "README.md")) {
-				t.Fatalf("expected invalid README path in error, got %v", err)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("failed list printed partial output: %q", stdout.String())
-			}
-		})
 	}
 }
 
 func TestListRejectsMismatchedID(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	writeListRecord(t, root, "20260922-valid", experiment.Record{ID: "20260922-valid", Title: "Valid", CreatedAt: metadataTestTime()})
+	writeListRecord(t, root, "20260922-valid", experiment.Record{Schema: experiment.Schema, ID: "20260922-valid", Title: "Valid", CreatedAt: metadataTestTime()})
 	const folder = "20260924-renamed"
 	const id = "20260924-original"
-	writeListRecord(t, root, folder, experiment.Record{ID: id, Title: "Renamed experiment", CreatedAt: metadataTestTime()})
+	writeListRecord(t, root, folder, experiment.Record{Schema: experiment.Schema, ID: id, Title: "Renamed experiment", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
 	err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout)
 	if err == nil {
 		t.Fatal("expected error for experiment ID differing from its folder")
 	}
-	for _, want := range []string{filepath.Join("experiments", folder, "README.md"), folder, id} {
+	for _, want := range []string{filepath.Join("experiments", folder, "expledger.yaml"), folder, id} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want %q", err, want)
 		}
@@ -195,5 +207,5 @@ func writeListRecord(t *testing.T, root, name string, record experiment.Record) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeREADME(t, root, name, data)
+	writeMetadata(t, root, name, data)
 }

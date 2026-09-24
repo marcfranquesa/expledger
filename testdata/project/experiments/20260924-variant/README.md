@@ -1,10 +1,3 @@
----
-id: 20260924-variant
-title: Lower learning rate
-created_at: 2026-09-24T06:30:00-04:00
-based_on:
-  - 20260924-baseline
----
 
 ## Hypothesis
 

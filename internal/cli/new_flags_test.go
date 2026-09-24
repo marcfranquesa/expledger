@@ -55,8 +55,9 @@ func TestNewMetadataFlags(t *testing.T) {
 			if !reflect.DeepEqual(record.BasedOn, parents) {
 				t.Fatalf("based_on = %v, want %v", record.BasedOn, parents)
 			}
-			if !strings.HasPrefix(string(record.Body), "\n# "+title+"\n") {
-				t.Fatalf("README heading does not use the title: %q", record.Body)
+			readme := readNewREADME(t, root, "my-idea")
+			if !strings.HasPrefix(string(readme), "# "+title+"\n") {
+				t.Fatalf("README heading does not use the title: %q", readme)
 			}
 		})
 	}
@@ -111,8 +112,9 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	if len(record.BasedOn) != 0 {
 		t.Fatalf("default based_on contains previous flags: %v", record.BasedOn)
 	}
-	if !strings.HasPrefix(string(record.Body), "\n# Next idea\n") {
-		t.Fatalf("default README heading = %q", record.Body)
+	readme := readNewREADME(t, root, "next-idea")
+	if !strings.HasPrefix(string(readme), "# Next idea\n") {
+		t.Fatalf("default README heading = %q", readme)
 	}
 }
 
@@ -156,14 +158,14 @@ func TestNewRejectsMissingParent(t *testing.T) {
 func TestNewRejectsInvalidParentRecord(t *testing.T) {
 	const parent = "20260920-baseline"
 	for _, tt := range []struct {
-		name   string
-		folder string
-		readme string
+		name     string
+		folder   string
+		metadata string
 	}{
-		{name: "missing README"},
-		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
-		{name: "mismatched ID", readme: "---\nid: 20260920-other\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
-		{name: "case mismatched folder", folder: "20260920-Baseline", readme: "---\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n\nOriginal research notes.\n"},
+		{name: "missing metadata"},
+		{name: "malformed metadata", metadata: "schema: expledger/v1\nid: [invalid]\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
+		{name: "mismatched ID", metadata: "schema: expledger/v1\nid: 20260920-other\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
+		{name: "case mismatched folder", folder: "20260920-Baseline", metadata: "schema: expledger/v1\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -176,9 +178,9 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			readme := filepath.Join(dir, "README.md")
-			if tt.readme != "" {
-				if err := os.WriteFile(readme, []byte(tt.readme), 0o644); err != nil {
+			metadata := filepath.Join(dir, "expledger.yaml")
+			if tt.metadata != "" {
+				if err := os.WriteFile(metadata, []byte(tt.metadata), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -189,8 +191,8 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 			}
 			var stdout bytes.Buffer
 			err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", parent, "README.md")) {
-				t.Fatalf("expected error naming invalid parent README, got %v", err)
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", parent, "expledger.yaml")) {
+				t.Fatalf("expected error naming invalid parent metadata, got %v", err)
 			}
 			if stdout.Len() != 0 {
 				t.Fatalf("failed command printed output: %q", stdout.String())
@@ -203,13 +205,13 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 			if err != nil || !bytes.Equal(data, notes) {
 				t.Fatalf("invalid parent changed existing notes: data=%q, err=%v", data, err)
 			}
-			data, err = os.ReadFile(readme)
-			if tt.readme == "" {
+			data, err = os.ReadFile(metadata)
+			if tt.metadata == "" {
 				if !os.IsNotExist(err) {
-					t.Fatalf("missing parent README unexpectedly created: err=%v", err)
+					t.Fatalf("missing parent metadata unexpectedly created: err=%v", err)
 				}
-			} else if err != nil || string(data) != tt.readme {
-				t.Fatalf("invalid parent changed existing README: data=%q, err=%v", data, err)
+			} else if err != nil || string(data) != tt.metadata {
+				t.Fatalf("invalid parent changed existing metadata: data=%q, err=%v", data, err)
 			}
 		})
 	}
@@ -218,24 +220,24 @@ func TestNewRejectsInvalidParentRecord(t *testing.T) {
 func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
 	const parent = "20260920-baseline"
 	for _, tt := range []struct {
-		name   string
-		readme string
+		name     string
+		metadata string
 	}{
-		{name: "missing README"},
-		{name: "malformed README", readme: "---\nid: [invalid]\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
-		{name: "mismatched ID", readme: "---\nid: 20260921-other\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n---\n"},
+		{name: "missing metadata"},
+		{name: "malformed metadata", metadata: "schema: expledger/v1\nid: [invalid]\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n"},
+		{name: "mismatched ID", metadata: "schema: expledger/v1\nid: 20260921-other\ntitle: Unrelated\ncreated_at: 2026-09-21T12:00:00Z\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
 			createMetadataParent(t, root, "baseline", 20)
 			createMetadataParent(t, root, "unrelated", 21)
-			readme := filepath.Join(root, "experiments", "20260921-unrelated", "README.md")
+			metadata := filepath.Join(root, "experiments", "20260921-unrelated", "expledger.yaml")
 			var err error
-			if tt.readme == "" {
-				err = os.Remove(readme)
+			if tt.metadata == "" {
+				err = os.Remove(metadata)
 			} else {
-				err = os.WriteFile(readme, []byte(tt.readme), 0o644)
+				err = os.WriteFile(metadata, []byte(tt.metadata), 0o644)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -253,13 +255,13 @@ func TestNewIgnoresInvalidUnrelatedExperiments(t *testing.T) {
 			if record := readNewRecord(t, root, "independent"); len(record.BasedOn) != 0 {
 				t.Fatalf("independent record has parents: %v", record.BasedOn)
 			}
-			data, err := os.ReadFile(readme)
-			if tt.readme == "" {
+			data, err := os.ReadFile(metadata)
+			if tt.metadata == "" {
 				if !os.IsNotExist(err) {
-					t.Fatalf("creation changed missing unrelated README: err=%v", err)
+					t.Fatalf("creation changed missing unrelated metadata: err=%v", err)
 				}
-			} else if err != nil || string(data) != tt.readme {
-				t.Fatalf("creation changed unrelated README: data=%q, err=%v", data, err)
+			} else if err != nil || string(data) != tt.metadata {
+				t.Fatalf("creation changed unrelated metadata: data=%q, err=%v", data, err)
 			}
 		})
 	}
@@ -295,7 +297,7 @@ func TestNewDoesNotValidateAncestors(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
 	const parent = "20260920-baseline"
-	writeREADME(t, root, parent, []byte("---\nid: "+parent+"\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\nbased_on: [20260919-missing]\n---\n"))
+	writeMetadata(t, root, parent, []byte("schema: expledger/v1\nid: "+parent+"\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\nbased_on: [20260919-missing]\n"))
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout); err != nil {
 		t.Fatalf("valid direct parent was rejected: %v", err)
@@ -351,7 +353,7 @@ func createMetadataParent(t *testing.T, root, slug string, day int) {
 
 func readNewRecord(t *testing.T, root, slug string) experiment.Record {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(root, "experiments", "20260924-"+slug, "README.md"))
+	data, err := os.ReadFile(filepath.Join(root, "experiments", "20260924-"+slug, "expledger.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,4 +362,13 @@ func readNewRecord(t *testing.T, root, slug string) experiment.Record {
 		t.Fatalf("parse generated experiment: %v", err)
 	}
 	return record
+}
+
+func readNewREADME(t *testing.T, root, slug string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "experiments", "20260924-"+slug, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
