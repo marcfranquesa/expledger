@@ -10,10 +10,7 @@ import (
 )
 
 func TestList(t *testing.T) {
-	root := t.TempDir()
-	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n# Baseline\n")
-	writeListREADME(t, root, "20260924-improved", "---\nid: 20260924-improved\ntitle: Improved model\nbased_on: [20260920-baseline, 20260919-reference]\n---\n# Findings\n")
-	writeListREADME(t, root, "20260919-reference", "---\nid: 20260919-reference\ntitle: Reference\n---\n")
+	root := filepath.Join("..", "..", "testdata", "project")
 
 	records, err := List(root)
 	if err != nil {
@@ -22,16 +19,38 @@ func TestList(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("records = %+v, want three experiments", records)
 	}
-	if records[0].ID != "20260924-improved" || records[0].Title != "Improved model" ||
-		!reflect.DeepEqual(records[0].BasedOn, []string{"20260920-baseline", "20260919-reference"}) ||
-		string(records[0].Body) != "# Findings\n" {
-		t.Fatalf("newest record = %+v, want improved model with its parents and body", records[0])
+	if records[0].ID != "20260924-long-title" || records[0].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" ||
+		!strings.Contains(string(records[0].Body), "Long-title fixture body") {
+		t.Fatalf("newest record = %+v, want long title and its body", records[0])
 	}
-	if records[1].ID != "20260920-baseline" || records[1].Title != "Baseline" || len(records[1].BasedOn) != 0 {
-		t.Fatalf("older record = %+v, want independent baseline", records[1])
+	if records[1].ID != "20260924-variant" || records[1].Title != "Lower learning rate" ||
+		!reflect.DeepEqual(records[1].BasedOn, []string{"20260924-baseline"}) {
+		t.Fatalf("middle record = %+v, want variant based on baseline", records[1])
 	}
-	if records[2].ID != "20260919-reference" {
-		t.Fatalf("oldest record = %+v, want reference", records[2])
+	if records[2].ID != "20260924-baseline" || records[2].Title != "Baseline model" || len(records[2].BasedOn) != 0 {
+		t.Fatalf("oldest record = %+v, want independent baseline", records[2])
+	}
+
+}
+
+func TestListOrdersTimestampInstants(t *testing.T) {
+	root := t.TempDir()
+	writeListREADME(t, root, "a-older", "---\nid: a-older\ntitle: Older\ncreated_at: 2026-09-24T12:00:00+02:00\n---\n")
+	writeListREADME(t, root, "b-newer", "---\nid: b-newer\ntitle: Newer\ncreated_at: 2026-09-24T11:00:00Z\n---\n")
+	writeListREADME(t, root, "c-same-instant", "---\nid: c-same-instant\ntitle: Same instant\ncreated_at: 2026-09-24T07:00:00-04:00\n---\n")
+	writeListREADME(t, root, "d-fractionally-newest", "---\nid: d-fractionally-newest\ntitle: Fractionally newest\ncreated_at: 2026-09-24T11:00:00.000000001Z\n---\n")
+
+	records, err := List(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, record := range records {
+		ids = append(ids, record.ID)
+	}
+	want := []string{"d-fractionally-newest", "b-newer", "c-same-instant", "a-older"}
+	if !reflect.DeepEqual(ids, want) {
+		t.Fatalf("IDs = %v, want %v", ids, want)
 	}
 }
 

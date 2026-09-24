@@ -17,7 +17,8 @@ Make sure Go's binary installation directory is on your `PATH`.
 | Name | Description |
 | --- | --- |
 | `expledger new <slug> [flags]` | Create a dated experiment folder and README at the Git working tree root. Use `--title` for a custom title and repeat `--based-on` for parent experiment IDs. |
-| `expledger list` | List experiment IDs and titles in descending ID order. |
+| `expledger list` | List experiment IDs and titles, newest `created_at` first. |
+| `expledger serve [--port <port>]` | Browse experiments in a local web page with links to their GitHub folders. |
 | `expledger help [command]` | Show general or command-specific help. Also available with `--help` or `-h`, such as `expledger new --help`. |
 
 ## Usage
@@ -64,6 +65,14 @@ expledger list
 
 This reads the README in each experiment directory and prints an ID/title table. A missing or empty `experiments/` directory reports "No experiments found." Missing or malformed experiment READMEs report an error with the file path. ID mismatches report the README path, YAML ID, and expected folder name without modifying files. Files and symlinked directories directly under `experiments/` are ignored; experiment artifacts are not scanned recursively.
 
+```sh
+expledger serve
+```
+
+Open the printed URL (default `http://127.0.0.1:8080`) to browse titles and creation times, newest first. Refresh to reload records; press Ctrl+C to stop. Use `--port <port>` to change the port, or `--port 0` to choose an available one.
+
+"View remote" opens a new tab using the GitHub `origin` remote, the branch checked out when the server starts, and each experiment's folder path. Links assume those folders are already published on that branch. Only YAML metadata is displayed.
+
 ## Agent skill
 
 After installing the CLI, link the [skill](skills/expledger/SKILL.md) from a
@@ -91,10 +100,19 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
+Preview the checked-in fixture experiments:
+
+```sh
+./scripts/preview.sh --port 0
+```
+
+The script builds the CLI and serves a temporary Git repository, then removes it when stopped. Its placeholder GitHub links do not exist.
+
 The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
 
 - `internal/cli`: command arguments, orchestration, and terminal output.
 - `internal/catalog`: discovery and validation (`List`), and lookup of loaded records (`Lookup`).
 - `internal/experiment`: individual records, creation with ID generation and atomic overwrite protection, and YAML parsing.
+- `internal/web`: HTTP handler and embedded HTML for the experiment browser.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

@@ -17,6 +17,13 @@ const newExample = `  expledger new my-idea
 const listDescription = "List experiment IDs and titles"
 
 const listDetails = `Read experiments/*/README.md at the Git working tree root.
-Display IDs and titles in descending ID order (newest first for generated IDs).
+Display IDs and titles by created_at, newest first.
 Each README's YAML id must exactly match its experiment folder name.
 Report missing or invalid experiment READMEs with their file path.`
+
+const serveDescription = "Browse experiments in a local web page"
+
+const serveDetails = `Serve experiment titles and creation times, newest first, on 127.0.0.1.
+Refresh the page to reread experiment metadata. GitHub links use the origin
+remote and branch checked out when the server starts; they assume the experiment
+folders are already published. Press Ctrl+C to stop the server.`

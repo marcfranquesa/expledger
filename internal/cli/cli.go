@@ -40,16 +40,12 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 	}
 	root.SetArgs(append([]string{}, args...))
 	root.SetOut(stdout)
-	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app))
+	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), serveExperimentsCommand(app))
 	return root.Execute()
 }
 
 func gitRoot(cwd string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = cwd
-	// Keep the diagnostic used below stable across the user's locale.
-	cmd.Env = append(os.Environ(), "LC_ALL=C")
-	output, err := cmd.Output()
+	output, err := gitOutput(cwd, "rev-parse", "--show-toplevel")
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -63,5 +59,14 @@ func gitRoot(cwd string) (string, error) {
 		}
 		return "", fmt.Errorf("find Git working tree: %w", err)
 	}
-	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), nil
+	return output, nil
+}
+
+func gitOutput(cwd string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = cwd
+	// Keep Git diagnostics stable for error handling across locales.
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	output, err := cmd.Output()
+	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), err
 }
