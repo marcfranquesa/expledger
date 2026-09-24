@@ -26,7 +26,7 @@ another tool's front matter, are never parsed or updated by ExpLedger.
 | `title` | Required nonblank string. It does not determine the ID or folder name. |
 | `created_at` | Required nonzero RFC3339 timestamp with a timezone, such as `2026-09-24T12:00:00Z` or `2026-09-24T08:00:00-04:00`. Quoted timestamps are accepted. |
 | `based_on` | Optional list of nonblank strings naming direct parent experiments. |
-| Other keys | Custom metadata with string keys; values retain their YAML types when re-encoded. |
+| Other keys | Custom metadata with string keys; accepted but not used by ExpLedger. |
 
 Timestamp precision is nanoseconds. Additional fractional-second digits are
 truncated when read. Re-encoding preserves the represented instant and supported
@@ -78,10 +78,9 @@ be real directories. Metadata must resolve to a regular file. Relative metadata
 symlinks that stay within the project root are readable; absolute links and paths
 that escape the root are rejected.
 
-Re-encoding retains custom metadata values and YAML types, including large
-numbers, binary values, and nulls, but does not promise original YAML layout or
-comments. Required field names and `based_on` are reserved; custom metadata cannot
-override them.
+ExpLedger writes metadata only when creating a new experiment. Existing metadata
+files, including custom fields and comments, are left untouched. The internal
+record codec retains only the standard fields listed above.
 
 The internal packages keep these boundaries: `experiment` owns the record and
 codec; `catalog` owns reading, discovery, and creation; `web` owns rendering and
