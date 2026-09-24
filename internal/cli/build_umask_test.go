@@ -29,7 +29,7 @@ func TestBuildHonorsUmask(t *testing.T) {
 	git(t, root, "init", "--quiet", "--initial-branch=main")
 	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(filepath.Join(root, "dist", "index.html"))

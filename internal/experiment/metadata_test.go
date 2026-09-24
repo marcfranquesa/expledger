@@ -29,13 +29,15 @@ func TestRecordRoundTrip(t *testing.T) {
 	}
 }
 
+var customMetadataValues = []string{
+	"",
+	"{0}",
+	"{nested: [{key: }, {!!null '': !!null ''}], empty_string: ''}",
+	"!future {tags: [analysis, ml], enabled: true, seed: 18446744073709551617, payload: !!binary SGVsbG8=}",
+}
+
 func TestParseAcceptsCustomMetadata(t *testing.T) {
-	for _, custom := range []string{
-		"",
-		"{0}",
-		"{nested: [{key: }, {!!null '': !!null ''}], empty_string: ''}",
-		"!future {tags: [analysis, ml], enabled: true, seed: 18446744073709551617, payload: !!binary SGVsbG8=}",
-	} {
+	for _, custom := range customMetadataValues {
 		t.Run(custom, func(t *testing.T) {
 			data := []byte("schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T12:00:00Z\ncustom: " + custom + "\n")
 			if _, err := Parse(data); err != nil {

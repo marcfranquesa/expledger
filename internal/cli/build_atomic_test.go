@@ -34,7 +34,7 @@ func TestBuildReplacesLinkedOutput(t *testing.T) {
 				t.Fatal(err)
 			}
 			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err != nil {
+			if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 				t.Fatal(err)
 			}
 			if data, err := os.ReadFile(target); err != nil || !bytes.Equal(data, notes) {
@@ -68,7 +68,7 @@ func TestBuildReplacementFailureCleansUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err == nil || stdout.Len() != 0 {
+	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err == nil || stdout.Len() != 0 {
 		t.Fatalf("failed replacement reported success: %v, %q", err, stdout.String())
 	}
 	if data, err := os.ReadFile(sentinel); err != nil || string(data) != "keep me" {
@@ -93,7 +93,7 @@ func TestBuildPreservesSnapshotPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {

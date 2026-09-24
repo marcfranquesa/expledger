@@ -42,7 +42,7 @@ func TestNewMetadataFlags(t *testing.T) {
 			createMetadataParent(t, root, "baseline", 20)
 			createMetadataParent(t, root, "comparison", 21)
 			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), tt.args, root, metadataTestTime(), &stdout); err != nil {
+			if err := cli.Run(context.Background(), tt.args, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
 				t.Fatal(err)
 			}
 			record := readNewRecord(t, root, "my-idea")
@@ -79,7 +79,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 			git(t, root, "init", "--quiet")
 			var stdout bytes.Buffer
 			args := append([]string{"new", "my-idea"}, tt.flags...)
-			if err := cli.Run(context.Background(), args, root, metadataTestTime(), &stdout); err == nil {
+			if err := cli.Run(context.Background(), args, root, metadataTestTime(), cli.Streams{Out: &stdout}); err == nil {
 				t.Fatalf("expected an error for %q", args)
 			}
 			if stdout.Len() != 0 {
@@ -101,11 +101,11 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	git(t, root, "init", "--quiet")
 	createMetadataParent(t, root, "baseline", 20)
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run(context.Background(), []string{"new", "next-idea"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "next-idea"}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	record := readNewRecord(t, root, "next-idea")
@@ -134,7 +134,7 @@ func TestNewRejectsExistingExperiment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	err = cli.Run(context.Background(), []string{"new", "my-idea"}, root, metadataTestTime(), &stdout)
+	err = cli.Run(context.Background(), []string{"new", "my-idea"}, root, metadataTestTime(), cli.Streams{Out: &stdout})
 	if !errors.Is(err, os.ErrExist) {
 		t.Fatalf("duplicate error = %v, want os.ErrExist", err)
 	}
@@ -150,7 +150,7 @@ func TestNewRejectsExistingExperiment(t *testing.T) {
 func TestNewHelpDescribesMetadataFlags(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, metadataTestTime(), &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {

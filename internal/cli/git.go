@@ -1,17 +1,18 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 )
 
-func gitRoot(cwd string) (string, error) {
-	output, err := gitOutput(cwd, "rev-parse", "--show-toplevel")
+func gitRoot(ctx context.Context, cwd string, isolateRepository bool) (string, error) {
+	output, err := gitOutput(ctx, cwd, isolateRepository, "rev-parse", "--show-toplevel")
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -28,31 +29,39 @@ func gitRoot(cwd string) (string, error) {
 	return output, nil
 }
 
-func gitOutput(cwd string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+func gitOutput(ctx context.Context, cwd string, isolateRepository bool, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = cwd
-	// Keep Git diagnostics stable for error handling across locales.
-	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	cmd.Env = cmd.Environ()
+	if isolateRepository {
+		cmd.Env = append(gitEnvironment(cmd.Env), "GIT_NO_REPLACE_OBJECTS=1")
+	}
+	// Keep diagnostics stable and bound inherited pipes after cancellation or exit.
+	cmd.Env = append(cmd.Env, "LC_ALL=C")
+	cmd.WaitDelay = time.Second
 	output, err := cmd.Output()
+	if err != nil && ctx.Err() != nil {
+		err = ctx.Err()
+	}
 	return strings.TrimSuffix(strings.TrimSuffix(string(output), "\n"), "\r"), err
 }
 
-func githubLocation(root string) (repositoryURL, branch string, err error) {
-	branch, err = gitOutput(root, "branch", "--show-current")
+func githubLocation(ctx context.Context, root string) (repositoryURL, branch string, err error) {
+	branch, err = gitOutput(ctx, root, false, "branch", "--show-current")
 	if err != nil {
 		return "", "", fmt.Errorf("read current Git branch: %w", err)
 	}
 	if branch == "" {
 		return "", "", nil
 	}
-	remotes, err := gitOutput(root, "remote")
+	remotes, err := gitOutput(ctx, root, false, "remote")
 	if err != nil {
 		return "", "", fmt.Errorf("read Git remotes: %w", err)
 	}
 	if !slices.Contains(strings.Split(remotes, "\n"), "origin") {
 		return "", branch, nil
 	}
-	remote, err := gitOutput(root, "remote", "get-url", "origin")
+	remote, err := gitOutput(ctx, root, false, "remote", "get-url", "origin")
 	if err != nil {
 		return "", "", fmt.Errorf("read origin remote: %w", err)
 	}
@@ -82,4 +91,33 @@ func githubRepositoryURL(remote string) (string, error) {
 		}
 	}
 	return "https://github.com/" + url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1]), nil
+}
+
+func gitEnvironment(env []string) []string {
+	clean := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "GIT_CONFIG") {
+			continue
+		}
+		switch name {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+			"GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS",
+			"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_GRAFT_FILE",
+			"GIT_SHALLOW_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_IMPLICIT_WORK_TREE",
+			"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM":
+			continue
+		}
+		clean = append(clean, entry)
+	}
+	return clean
+}
+
+func runGit(ctx context.Context, cwd string, args ...string) (string, error) {
+	output, err := gitOutput(ctx, cwd, true, args...)
+	var exit *exec.ExitError
+	if errors.As(err, &exit) {
+		return "", fmt.Errorf("git: %s: %w", strings.TrimSpace(string(exit.Stderr)), err)
+	}
+	return output, err
 }

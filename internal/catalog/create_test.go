@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -49,6 +50,28 @@ func TestCreate(t *testing.T) {
 	data, err = os.ReadFile(path)
 	if err != nil || string(data) != "existing research notes" {
 		t.Fatalf("duplicate attempt changed original: data=%q, err=%v", data, err)
+	}
+}
+
+func TestCreateScaffoldsExecutableRunner(t *testing.T) {
+	dir, err := Create(t.TempDir(), "baseline", time.Now(), CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(dir, "run.sh"))
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0100 == 0 {
+		t.Fatalf("run.sh is not a regular executable: info=%v, err=%v", info, err)
+	}
+	command := exec.Command("./run.sh")
+	command.Dir = dir
+	output, err := command.CombinedOutput()
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 || !strings.Contains(string(output), "Configure run.sh") {
+		t.Fatalf("placeholder result = %q, %v; want configuration guidance and exit 1", output, err)
+	}
+	record, err := Read(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir))
+	if err != nil || record.LastRun != nil {
+		t.Fatalf("new experiment has unexpected run metadata: receipt=%+v, err=%v", record.LastRun, err)
 	}
 }
 

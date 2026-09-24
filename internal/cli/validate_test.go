@@ -27,7 +27,7 @@ func TestValidateFromNestedDirectory(t *testing.T) {
 	writeMetadata(t, root, "unrelated", []byte("invalid metadata\n"))
 
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"validate", validateID}, cwd, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"validate", validateID}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/expledger.yaml\n"; got != want {
@@ -55,7 +55,7 @@ func TestValidateRejectsInvalidMetadataWithoutChangingIt(t *testing.T) {
 			git(t, root, "init", "--quiet")
 			metadata := writeMetadata(t, root, validateID, []byte(tt.data))
 			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, cli.Streams{Out: &stdout})
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
@@ -91,7 +91,7 @@ func TestValidateMissingMetadata(t *testing.T) {
 				}
 			}
 			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, cli.Streams{Out: &stdout})
 			wantPath := filepath.Join("experiments", validateID)
 			if existingFolder {
 				wantPath = filepath.Join(wantPath, "expledger.yaml")

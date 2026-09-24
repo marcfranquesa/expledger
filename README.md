@@ -1,12 +1,13 @@
 # ExpLedger
 
-ExpLedger records coding experiments as folders with `expledger.yaml` metadata
-and independent Markdown notes in your Git repository.
+ExpLedger records coding experiments as folders in your Git repository and runs
+their `run.sh` scripts in place.
 
 ```text
 experiments/20260924-baseline/
 ├── expledger.yaml
 ├── README.md
+├── run.sh
 └── ... supporting files
 ```
 
@@ -14,7 +15,8 @@ ExpLedger discovers only folders containing `expledger.yaml` with
 `schema: expledger/v1`.
 
 The [record format](docs/format.md) defines metadata, parent references, and
-filesystem rules for hand-written records and integrations.
+filesystem rules. The [running guide](docs/running.md) covers entrypoints and
+recorded project provenance.
 
 ExpLedger is in active development. Expect breaking changes.
 
@@ -22,7 +24,8 @@ ExpLedger is in active development. Expect breaking changes.
 
 | Name | Description |
 | --- | --- |
-| `expledger new <slug> [flags]` | Create a dated experiment folder with `expledger.yaml` and `README.md`. |
+| `expledger new <slug> [flags]` | Create a dated folder with metadata, notes, and an executable `run.sh` stub. |
+| `expledger run <id>` | Execute the experiment's `run.sh` and record the current project commit and dirty state. |
 | `expledger list` | List experiment IDs and titles, newest first. |
 | `expledger validate <id>` | Validate an experiment's `expledger.yaml` and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
