@@ -164,7 +164,7 @@ func TestCommandHelp(t *testing.T) {
 	}{
 		{name: "new", argument: "<slug>"},
 		{name: "validate", argument: "<id>"},
-		{name: "run", argument: "<id>", helpText: []string{"--at", "run.sh", "EXPLEDGER_OUTPUT_DIR"}},
+		{name: "run", argument: "<id>", helpText: []string{"run.sh"}},
 		{name: "list"},
 		{name: "build", helpText: []string{"--output", "dist", "index.html", "snapshot"}},
 		{name: "serve", helpText: []string{"--port", "127.0.0.1", "Ctrl+C"}},
@@ -187,6 +187,9 @@ func TestCommandHelp(t *testing.T) {
 					if !strings.Contains(stdout.String(), want) {
 						t.Errorf("help missing %q: %s", want, stdout.String())
 					}
+				}
+				if command.name == "run" && (strings.Contains(stdout.String(), "--at") || strings.Contains(stdout.String(), "EXPLEDGER_")) {
+					t.Errorf("run help still advertises revision selection or managed output paths: %s", &stdout)
 				}
 				assertEmptyDirectory(t, root)
 			})
@@ -238,8 +241,7 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 		{"run", "selected", "another-id"},
 		{"run", "selected", "--", "seed=7"},
 		{"run", "selected", "--seed", "7"},
-		{"run", "selected", "--at="},
-		{"run", "selected", "--at", " \t "},
+		{"run", "selected", "--at", "HEAD"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			root := t.TempDir()

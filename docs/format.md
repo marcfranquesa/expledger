@@ -27,7 +27,7 @@ another tool's front matter, are never parsed or updated by ExpLedger.
 | `title` | Required nonblank string. It does not determine the ID or folder name. |
 | `created_at` | Required nonzero RFC3339 timestamp with a timezone, such as `2026-09-24T12:00:00Z` or `2026-09-24T08:00:00-04:00`. Quoted timestamps are accepted. |
 | `based_on` | Optional list of nonblank strings naming direct parent experiments. |
-| `last_run` | Optional mapping with `project_commit` and `started_at`, recording the latest launched entrypoint. See below. |
+| `last_run` | Optional mapping with `project_commit`, `project_dirty`, and `started_at`, recording a launched entrypoint. See below. |
 | Other keys | Custom metadata with string keys; accepted but not used by ExpLedger, and preserved when recording a run. |
 
 Timestamp precision is nanoseconds. Additional fractional-second digits are
@@ -38,24 +38,31 @@ are unsupported, including within custom metadata.
 
 ## Run receipt
 
-`last_run.project_commit` is a full Git commit ID: 40 or 64 lowercase hexadecimal
-characters. `last_run.started_at` is a nonzero RFC3339 timestamp with a timezone,
-using the same timestamp rules as `created_at`.
-Both fields are required when `last_run` is present; null and additional receipt
-fields are rejected.
+`last_run.project_commit` is the checkout's Git `HEAD` observed before launch,
+stored as 40 or 64 lowercase hexadecimal characters. `project_dirty` is a boolean indicating
+Git-visible staged, unstaged, or untracked changes outside `experiments/` at
+launch; ignored files are excluded. `started_at` is a nonzero RFC3339 timestamp
+with a timezone, using the same rules as `created_at`.
+
+`project_commit` and `started_at` are required. Older receipts may omit
+`project_dirty`, which is read as `false`; new receipts always write it. Null
+values and additional receipt fields are rejected.
 
 ```yaml
 last_run:
   project_commit: 0123456789abcdef0123456789abcdef01234567
+  project_dirty: false
   started_at: 2026-09-24T14:30:00Z
 ```
 
-`run` updates this receipt when the entrypoint actually launches, including runs
+Each `run` replaces this receipt when the entrypoint actually launches, including runs
 that later fail or are interrupted. A failure before launch leaves the previous
 receipt unchanged. The receipt records no outcome or run history; it does not
-assert that the experiment succeeded. Rebases and merges never remap its commit.
-An experiment without a receipt remains valid and needs an explicit `--at` for
-its first run. See [running experiments](running.md) for execution semantics.
+assert that the experiment succeeded. Existing receipts never affect execution:
+each run uses the current checkout and records its current `HEAD`. Experiment-only
+commits can advance this hash without changing project code. An experiment without
+a receipt remains valid. See [running experiments](running.md) for execution
+semantics and reproducibility limits.
 
 ## IDs and creation
 
@@ -101,8 +108,8 @@ The `experiments` directory and directly requested experiment directories must
 be real directories. Metadata must resolve to a regular file. Relative metadata
 symlinks that stay within the project root are readable; absolute links and paths
 that escape the root are rejected.
-Running requires a regular metadata file and rejects symlinks and special files
-anywhere in the selected experiment definition.
+Running requires `expledger.yaml` and executable `run.sh` to be regular files,
+not symlinks. Supporting files are not scanned by the runner.
 
 The internal record codec retains only the standard fields listed above. The
 run receipt writer updates `last_run` in the original YAML document, preserving

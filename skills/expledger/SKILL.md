@@ -32,29 +32,26 @@ manager, for example:
 exec uv run --locked python experiment.py --seed 42
 ```
 
-Run the first time with an explicit project ref:
+Prepare the intended project checkout and environment, then run:
 
 ```sh
-expledger run <id> --at main
+expledger run <id>
 ```
 
-Later `expledger run <id>` reuses `last_run.project_commit`. Use `--at <ref>` only
-when deliberately selecting another project revision. Do not rewrite the receipt
-after a rebase or merge: it records the latest launched entrypoint, including a
-run that failed or was interrupted, and does not record success.
+ExpLedger runs the existing `./run.sh` from the experiment directory with your
+environment. The script chooses where to write results. Use regular files for
+`run.sh` and `expledger.yaml`, and use batch workloads rather than interactive
+jobs or daemons.
 
-ExpLedger copies the current experiment into a temporary checkout of that project
-commit and runs `./run.sh` from the copied experiment directory. Prepare and use
-the environment from `EXPLEDGER_PROJECT_DIR`. Write durable results to
-`EXPLEDGER_OUTPUT_DIR`; its actual path is printed to stderr and is local to the
-repository's common Git directory, shared by its worktrees. Results left in the temporary
-checkout are removed. Copy or publish artifacts that need to be shared.
+After launch, `last_run` records the current Git `HEAD`, start time, and whether
+Git sees staged, unstaged, or untracked project changes outside `experiments/`.
+Ignored files are excluded. Failed and interrupted workloads still count as
+launches; the receipt does not record success or select code for future runs.
+After a rebase, the next run records the new current `HEAD` automatically.
 
-Keep experiment-branch edits under `experiments/`. The runner uses the current
-experiment definition, including uncommitted files, with historical project code;
-it does not snapshot dependencies, datasets, or the environment. Record these in
-Method when needed to reproduce the result. Avoid symlinks and special files in
-the experiment, and use batch workloads rather than interactive jobs or daemons.
+Keep experiment-branch edits under `experiments/`. Record dependencies, datasets,
+and environment details in Method when needed to reproduce the result; a commit
+and dirty flag do not capture them. Copy or publish artifacts that need sharing.
 
 Use `expledger new --help`, `expledger run --help`, and the
 [running guide](../../docs/running.md) for the command contract.

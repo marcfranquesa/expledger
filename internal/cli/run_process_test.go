@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -28,9 +27,9 @@ func TestExecuteRunPreparationDoesNotPublish(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			published := false
-			safe, err := executeRun(tt.ctx, tt.cmd, func() error { published = true; return nil })
-			if err == nil || !safe || published {
-				t.Fatalf("safe=%v, err=%v, published=%v", safe, err, published)
+			err := executeRun(tt.ctx, tt.cmd, func() error { published = true; return nil })
+			if err == nil || published {
+				t.Fatalf("err=%v, published=%v", err, published)
 			}
 		})
 	}
@@ -50,15 +49,15 @@ func TestExecuteRunReceiptFailureStopsWorkload(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			publishErr := errors.New("metadata is no longer writable")
-			safe, err := executeRun(ctx, cmd, func() error {
+			err := executeRun(ctx, cmd, func() error {
 				data := make([]byte, 5)
 				if _, err := io.ReadFull(ready, data); err != nil {
 					return err
 				}
 				return publishErr
 			})
-			if !safe || !errors.Is(err, publishErr) || ExitCode(err) != 1 {
-				t.Fatalf("receipt failure: safe=%v, err=%v, code=%d", safe, err, ExitCode(err))
+			if !errors.Is(err, publishErr) || ExitCode(err) != 1 {
+				t.Fatalf("receipt failure: err=%v, code=%d", err, ExitCode(err))
 			}
 			if cmd.ProcessState == nil || !cmd.ProcessState.Exited() && cmd.ProcessState.ExitCode() != -1 {
 				t.Fatal("workload was not waited for")
@@ -75,9 +74,9 @@ func TestExecuteRunReceiptFailureStopsWorkload(t *testing.T) {
 func TestExecuteRunPreservesSignalExit(t *testing.T) {
 	cmd := exec.Command("/bin/sh", "-c", "kill -TERM $$")
 	published := false
-	safe, err := executeRun(context.Background(), cmd, func() error { published = true; return nil })
-	if !safe || !published || ExitCode(err) != 143 {
-		t.Fatalf("safe=%v, published=%v, err=%v", safe, published, err)
+	err := executeRun(context.Background(), cmd, func() error { published = true; return nil })
+	if !published || ExitCode(err) != 143 {
+		t.Fatalf("published=%v, err=%v", published, err)
 	}
 }
 
@@ -130,36 +129,18 @@ func TestExecuteRunCancellationWithCallerOwnedInput(t *testing.T) {
 	cmd := exec.Command("/bin/sh", "-c", "exec sleep 30")
 	cmd.Stdin = reader
 	done := make(chan struct{})
-	var safe bool
 	var err error
 	go func() {
-		safe, err = executeRun(ctx, cmd, func() error { cancel(); return nil })
+		err = executeRun(ctx, cmd, func() error { cancel(); return nil })
 		close(done)
 	}()
 	select {
 	case <-done:
-		if !safe || ExitCode(err) != 130 {
-			t.Fatalf("cancellation with caller-owned input: safe=%v, err=%v", safe, err)
+		if ExitCode(err) != 130 {
+			t.Fatalf("cancellation with caller-owned input: err=%v", err)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("workload did not stop after caller closed input")
-	}
-}
-
-func TestCopyRunDefinitionHonorsCancellation(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var output strings.Builder
-	_, err := io.Copy(cancelRunCopy{&output, cancel}, runInput{ctx, strings.NewReader(strings.Repeat("x", 128*1024))})
-	if !errors.Is(err, context.Canceled) || output.Len() == 0 || output.Len() >= 128*1024 {
-		t.Fatalf("copy did not stop between chunks: bytes=%d, err=%v", output.Len(), err)
-	}
-	destination := t.TempDir()
-	if err := copyRunDefinition(ctx, t.TempDir(), destination, "example"); !errors.Is(err, context.Canceled) {
-		t.Fatalf("canceled definition copy = %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(destination, "experiments")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("canceled preparation wrote experiment inputs: %v", err)
 	}
 }
 
@@ -176,15 +157,4 @@ func TestZombieGroupCheckDoesNotHideLiveOrUnknownProcesses(t *testing.T) {
 			t.Errorf("snapshot %q: safe=%v, want %v", tt.snapshot, got, tt.safe)
 		}
 	}
-}
-
-type cancelRunCopy struct {
-	io.Writer
-	cancel context.CancelFunc
-}
-
-func (w cancelRunCopy) Write(p []byte) (int, error) {
-	n, err := w.Writer.Write(p)
-	w.cancel()
-	return n, err
 }

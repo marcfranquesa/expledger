@@ -11,9 +11,10 @@ import (
 
 var projectCommitPattern = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
-// RunReceipt records the project revision used by the latest launched execution.
+// RunReceipt records the checkout baseline and project changes observed at launch.
 type RunReceipt struct {
 	ProjectCommit string    `yaml:"project_commit"`
+	ProjectDirty  bool      `yaml:"project_dirty"`
 	StartedAt     time.Time `yaml:"started_at"`
 }
 
@@ -85,6 +86,10 @@ func validateRunReceiptNode(node *yaml.Node) error {
 		case "project_commit":
 			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
 				return errors.New("last_run.project_commit must be a string")
+			}
+		case "project_dirty":
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!bool" {
+				return errors.New("last_run.project_dirty must be a boolean")
 			}
 		case "started_at":
 			if err := validateTimestampNode("last_run.started_at", value); err != nil {

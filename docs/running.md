@@ -1,87 +1,50 @@
 # Running experiments
 
-Each runnable experiment has an executable `experiments/<id>/run.sh`. `new`
-creates a stub that fails with an explanatory message; replace it with the
-workload before running. Existing records remain readable without an entrypoint.
-
-Put parameters in `run.sh` or configuration files beside it. ExpLedger accepts
-no workload arguments and executes `./run.sh` directly; the shebang chooses the
-interpreter. For example, with `experiment.py` beside the entrypoint:
+`expledger new` creates an executable `experiments/<id>/run.sh` stub that exits
+with configuration guidance. Replace it with the experiment's commands, using a
+shebang and fixed parameters. For example, with `experiment.py` beside it:
 
 ```sh
 #!/bin/sh
 exec uv run --locked python experiment.py --seed 42
 ```
 
-The entrypoint must prepare and use the environment required by the selected
-project revision. Use the project's environment manager and lockfile. The
-script's working directory is the copied experiment directory.
-
-## Select project code
+Prepare the project checkout and dependencies you want. The repository must have
+at least one Git commit. Then run:
 
 ```sh
-expledger run <id> --at main
 expledger run <id>
-expledger run <id> --at <other-project-ref>
 ```
 
-The first run requires `--at <ref>`. ExpLedger resolves that ref once to a full
-commit ID. Later runs without `--at` use `last_run.project_commit`; selecting a
-new ref is explicit. There is no automatic selection from `HEAD`, branch
-ancestry, rebases, or merges.
+ExpLedger executes `./run.sh` directly from the existing experiment directory.
+The script inherits your environment and writes results wherever it chooses.
+Keep parameters in the script or nearby configuration; additional arguments and
+revision-selection options are rejected. Both `run.sh` and `expledger.yaml` must
+be regular files, and `run.sh` must be executable. Supporting files are left to
+the script.
 
-ExpLedger creates a temporary detached Git worktree at the selected commit. It
-replaces that checkout's selected experiment directory with a copy of the
-current experiment definition, including uncommitted and untracked files. The
-invoking checkout stays on its current branch with its project files unchanged.
-Symlinks and special files in the experiment are rejected.
+On macOS and Linux, standard input from a pipe or file, both output streams, and
+the workload's exit status are forwarded. Ctrl-C stops the workload and its
+ordinary children. Use batch workloads; interactive terminal input, job control,
+and daemons are unsupported. Children must keep the workload's process group and
+user identity so ExpLedger can stop them.
 
-The copy includes only the selected experiment directory. Project files and
-other experiment directories come from the historical checkout. Shared helpers
-outside the selected directory therefore use that revision. Keep experiment
-branches limited to `experiments/` as a workflow convention; ExpLedger does not
-enforce a branch-diff policy.
+## Recorded provenance
 
-The recorded commit must remain available locally. A missing object is an error;
-ExpLedger does not substitute a newer revision or remap the hash. Prefer commits
-in retained main-branch history when choosing project revisions.
+ExpLedger reads Git `HEAD` and project changes before starting the script. Each
+launch replaces `last_run` with that commit, a launch timestamp, and
+`project_dirty`. The dirty flag covers Git-visible staged,
+unstaged, and untracked changes outside `experiments/`; ignored files are excluded.
+The commit is the checkout's committed baseline. Even an experiment-only commit
+advances its hash without changing project code.
+When `project_dirty` is true, reproduction also requires the uncommitted project
+changes; the hash alone does not capture them.
 
-This runs the current experiment definition against pinned project code. It does
-not restore the original script or configuration, and does not capture
-dependencies, datasets, or the environment. The commit alone is insufficient for
-full reproduction.
+A failed or interrupted workload still counts as a launch. Failures before launch
+preserve the previous receipt. There is no outcome or run history. The receipt
+never selects code: after a rebase, the next run records the new current `HEAD`.
+See the [record format](format.md#run-receipt) for field details.
 
-## Keep results
-
-The workload receives two absolute paths:
-
-| Variable | Meaning |
-| --- | --- |
-| `EXPLEDGER_PROJECT_DIR` | Root of the prepared historical project checkout. |
-| `EXPLEDGER_OUTPUT_DIR` | Unique persistent output directory for this invocation. |
-
-Write every result that must survive to `EXPLEDGER_OUTPUT_DIR`. Files left in the
-temporary checkout are removed during cleanup. ExpLedger prints the output path
-to stderr and retains the directory when a workload fails.
-
-Outputs live under the repository's common Git directory at
-`expledger/runs/<id>/`, with a unique child directory for each invocation. Linked
-worktrees share this location, so removing a linked worktree does not delete its
-results. These outputs are local,
-are not committed or pushed with the experiment, and have no automatic retention
-policy. Copy or publish selected results yourself when they must be shared.
-
-## Launches and cancellation
-
-After launching the entrypoint, ExpLedger updates the source experiment's
-`last_run` receipt with the project commit and launch timestamp. Nonzero exits
-and interruptions still count as launches. Failures before launch preserve the
-previous receipt. No exit status or outcome history is stored in metadata.
-
-Only one run of an ID can be active in an invoking worktree at a time. On macOS
-and Linux, interruption cancels the workload and its ordinary child processes
-before cleanup. Standard input from a pipe or file and both output streams are
-forwarded. The runner is intended for batch workloads; reading interactively
-from the terminal, interactive job control, and daemon processes are unsupported.
-Child processes must retain the workload's process group and user identity so
-ExpLedger can stop them before removing the checkout.
+To reproduce a result, prepare the desired revision yourself and retain its
+experiment inputs, dependency lockfiles, datasets, and environment details.
+The receipt is a Git observation at launch, not a snapshot of all those inputs.

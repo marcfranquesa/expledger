@@ -34,7 +34,7 @@ func gitOutput(ctx context.Context, cwd string, isolateRepository bool, args ...
 	cmd.Dir = cwd
 	cmd.Env = cmd.Environ()
 	if isolateRepository {
-		cmd.Env = append(runEnvironment(cmd.Env), "GIT_NO_REPLACE_OBJECTS=1")
+		cmd.Env = append(gitEnvironment(cmd.Env), "GIT_NO_REPLACE_OBJECTS=1")
 	}
 	// Keep diagnostics stable and bound inherited pipes after cancellation or exit.
 	cmd.Env = append(cmd.Env, "LC_ALL=C")
@@ -93,7 +93,7 @@ func githubRepositoryURL(remote string) (string, error) {
 	return "https://github.com/" + url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1]), nil
 }
 
-func runEnvironment(env []string) []string {
+func gitEnvironment(env []string) []string {
 	clean := make([]string, 0, len(env))
 	for _, entry := range env {
 		name, _, _ := strings.Cut(entry, "=")
@@ -102,10 +102,10 @@ func runEnvironment(env []string) []string {
 		}
 		switch name {
 		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+			"GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS",
 			"GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_GRAFT_FILE",
 			"GIT_SHALLOW_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_IMPLICIT_WORK_TREE",
-			"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM",
-			"EXPLEDGER_PROJECT_DIR", "EXPLEDGER_OUTPUT_DIR":
+			"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM":
 			continue
 		}
 		clean = append(clean, entry)

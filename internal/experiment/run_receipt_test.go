@@ -20,7 +20,7 @@ func TestRunReceiptRoundTrip(t *testing.T) {
 		if record.LastRun != nil {
 			t.Fatal("legacy metadata unexpectedly has a run receipt")
 		}
-		record.LastRun = &RunReceipt{ProjectCommit: hash, StartedAt: time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("", -4*60*60))}
+		record.LastRun = &RunReceipt{ProjectCommit: hash, ProjectDirty: true, StartedAt: time.Date(2026, 9, 24, 23, 59, 0, 123456789, time.FixedZone("", -4*60*60))}
 		data, err := record.Marshal()
 		if err != nil {
 			t.Fatal(err)
@@ -29,9 +29,17 @@ func TestRunReceiptRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.LastRun == nil || got.LastRun.ProjectCommit != hash || !got.LastRun.StartedAt.Equal(record.LastRun.StartedAt) {
+		if got.LastRun == nil || got.LastRun.ProjectCommit != hash || !got.LastRun.ProjectDirty || !got.LastRun.StartedAt.Equal(record.LastRun.StartedAt) {
 			t.Fatalf("run receipt changed: got=%+v, want=%+v", got.LastRun, record.LastRun)
 		}
+	}
+}
+
+func TestParseRunReceiptWithoutDirtyFlag(t *testing.T) {
+	data := receiptMetadata + "last_run: {project_commit: " + strings.Repeat("a", 40) + ", started_at: 2026-09-24T12:00:00Z}\n"
+	record, err := Parse([]byte(data))
+	if err != nil || record.LastRun == nil || record.LastRun.ProjectDirty {
+		t.Fatalf("legacy receipt: %+v, error: %v", record.LastRun, err)
 	}
 }
 
@@ -60,6 +68,9 @@ func TestParseRejectsInvalidRunReceipt(t *testing.T) {
 		"single digit hour":   strings.Replace(valid, "2026-09-24T12:00:00Z", "'2026-09-24T2:00:00Z'", 1),
 		"comma fractions":     strings.Replace(valid, "2026-09-24T12:00:00Z", "'2026-09-24T12:00:00,5Z'", 1),
 		"out of range offset": strings.Replace(valid, "2026-09-24T12:00:00Z", "'2026-09-24T12:00:00+24:00'", 1),
+		"null dirty":          strings.Replace(valid, "}", ", project_dirty: null}", 1),
+		"numeric dirty":       strings.Replace(valid, "}", ", project_dirty: 1}", 1),
+		"string dirty":        strings.Replace(valid, "}", ", project_dirty: 'true'}", 1),
 		"unknown field":       strings.Replace(valid, "}", ", exit_code: 0}", 1),
 		"numeric key":         strings.Replace(valid, "}", ", 42: ignored}", 1),
 		"duplicate field":     strings.Replace(valid, "}", ", project_commit: "+hash+"}", 1),

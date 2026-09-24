@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -15,33 +14,15 @@ import (
 	"time"
 )
 
-func lockRun(root *os.Root, path string) (func() error, error) {
-	f, err := root.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		f.Close()
-		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, errors.New("another run of this experiment is active")
-		}
-		return nil, err
-	}
-	// Keep the inode: unlinking a lock file would allow two independent locks.
-	return f.Close, nil
-}
-
-// executeRun returns whether the checkout can be removed after waiting for the
-// entrypoint and stopping the ordinary children in its process group.
-func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) (bool, error) {
+func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) error {
 	if err := ctx.Err(); err != nil {
-		return true, err
+		return err
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// Bound waits for os/exec's pipes if a descendant retains an output stream.
 	cmd.WaitDelay = time.Second
 	if err := cmd.Start(); err != nil {
-		return true, fmt.Errorf("launch run.sh: %w", err)
+		return fmt.Errorf("launch run.sh: %w", err)
 	}
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
@@ -62,7 +43,7 @@ func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) (bool
 		case waitErr = <-done:
 		case <-timer.C:
 			if err := stopRunGroup(cmd.Process.Pid); err != nil {
-				return false, errors.Join(interruption, err)
+				return errors.Join(interruption, err)
 			}
 			groupStopped = true
 			waitErr = <-done
@@ -74,7 +55,7 @@ func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) (bool
 		groupErr = stopRunGroup(cmd.Process.Pid)
 	}
 	if interruption != nil {
-		return groupErr == nil, errors.Join(interruption, groupErr)
+		return errors.Join(interruption, groupErr)
 	}
 	if waitErr != nil {
 		var exit *exec.ExitError
@@ -86,18 +67,16 @@ func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) (bool
 			waitErr = &workloadExit{code}
 		}
 	}
-	return groupErr == nil, errors.Join(waitErr, groupErr)
+	return errors.Join(waitErr, groupErr)
 }
 
 func stopRunGroup(pid int) error {
-	// Grandchildren cannot be reaped here. A successful SIGKILL stops their
-	// execution; probing group existence would also count already-dead zombies.
+	// Signal ordinary descendants that remain after the entrypoint exits.
 	if err := syscall.Kill(-pid, syscall.SIGKILL); errors.Is(err, syscall.ESRCH) {
 		return nil
 	} else if err != nil {
 		// macOS can report EPERM for an orphaned group containing only zombies.
-		// Check states before allowing cleanup; a live process with another owner
-		// must still produce a failure and keep its checkout.
+		// Do not mask failures to stop live processes with different owners.
 		if runtime.GOOS == "darwin" && errors.Is(err, syscall.EPERM) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()

@@ -11,19 +11,18 @@ single hyphens between words. Existing experiments are never overwritten.
 Validate only the direct parents named by --based-on. Each must have a valid
 expledger.yaml whose id exactly matches its experiment folder name.`
 
-const runDescription = "Run an experiment against its recorded project revision"
+const runDescription = "Run an experiment's run.sh in its existing folder"
 
-const runDetails = `Execute ./run.sh from a copy of experiments/<id>/ in a temporary Git worktree.
-Use --at <ref> on the first run or to deliberately select new project code.
-Otherwise reuse last_run.project_commit. Record the revision and start time after
-launch, including runs that fail. Your current checkout stays on its branch.
-Keep all workload parameters in run.sh or its input files; extra arguments are
-rejected. The shebang selects the runtime. Standard streams and exit status are
-forwarded. Ctrl+C stops the workload and its ordinary child processes.
-EXPLEDGER_PROJECT_DIR identifies the prepared checkout. Write durable results to
-EXPLEDGER_OUTPUT_DIR, whose path is printed on stderr. Other worktree files are
-removed after execution. This uses today's experiment definition, not a snapshot
-of an earlier run. Runners require macOS or Linux and support batch workloads.`
+const runDetails = `Execute ./run.sh from experiments/<id>/ with the current checkout and environment.
+Prepare the desired project revision yourself; the repository needs a Git commit.
+Keep workload parameters in run.sh or its input files; extra arguments are rejected.
+The script chooses output paths.
+After launch, record HEAD, project changes outside experiments/, and the start time
+in last_run, including failed or interrupted runs. Ignored files are excluded from
+the dirty flag. Existing receipts do not affect execution.
+The shebang selects the runtime. Standard streams and exit status are forwarded.
+Ctrl+C stops the workload and its ordinary child processes. Requires macOS or
+Linux; supports batch workloads, not interactive terminal input or daemons.`
 
 const newExample = `  expledger new my-idea
   expledger new my-idea --title "My experiment" --based-on 20260920-baseline

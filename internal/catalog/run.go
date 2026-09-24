@@ -12,7 +12,7 @@ import (
 )
 
 // RecordRun records a launched execution using freshly read metadata.
-// Only last_run changes; callers must serialize runs of the same experiment.
+// Only last_run changes. Concurrent callers may overwrite each other's receipts.
 func RecordRun(root, id string, receipt experiment.RunReceipt) error {
 	if err := validateID(id); err != nil {
 		return err
