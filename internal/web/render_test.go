@@ -12,7 +12,7 @@ import (
 func TestRenderInMemory(t *testing.T) {
 	records := []experiment.Record{
 		{
-			ID: "first # record", Title: "<script>Trial & result</script>",
+			ID: "first # record & notes", Title: `<script>alert("x")</script> & trial`,
 			CreatedAt: time.Date(2026, 9, 24, 12, 30, 0, 123456789, time.FixedZone("local", -4*60*60)),
 		},
 		{
@@ -29,8 +29,10 @@ func TestRenderInMemory(t *testing.T) {
 	page := string(body)
 	for _, want := range []string{
 		"Explicit / project &amp; notes",
-		"&lt;script&gt;Trial &amp; result&lt;/script&gt;",
-		`href="https://github.com/owner/repo/tree/research%2Fnext/experiments/first%20%23%20record"`,
+		"&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; trial",
+		"first # record &amp; notes",
+		"research/next",
+		`href="https://github.com/owner/repo/tree/research%2Fnext/experiments/first%20%23%20record%20&amp;%20notes"`,
 		`datetime="2026-09-24T16:30:00.123456789Z"`,
 		"Sep 24, 2026 · 16:30:00 UTC",
 		"Later timestamp, supplied second",
@@ -42,7 +44,7 @@ func TestRenderInMemory(t *testing.T) {
 	if strings.Contains(page, "<script>") {
 		t.Error("page contains an unescaped script tag")
 	}
-	if strings.Index(page, "first # record") >= strings.Index(page, "Later timestamp, supplied second") {
+	if strings.Index(page, "first # record &amp; notes") >= strings.Index(page, "Later timestamp, supplied second") {
 		t.Fatal("renderer changed the supplied record order")
 	}
 }
