@@ -200,3 +200,43 @@ func writeListREADME(t *testing.T, root, name, content string) {
 		t.Fatal(err)
 	}
 }
+
+func TestListRecordsCanBeRead(t *testing.T) {
+	root := t.TempDir()
+	for _, id := range []string{"20260924-baseline", "Existing notes", "café-α", " leading and trailing "} {
+		content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n# Keep these notes\n", id)
+		writeListREADME(t, root, id, content)
+	}
+	records, err := List(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 4 {
+		t.Fatalf("List returned %d records, want 4", len(records))
+	}
+	for _, listed := range records {
+		read, err := Read(root, listed.ID)
+		if err != nil || !reflect.DeepEqual(read, listed) {
+			t.Errorf("Read(%q) = %+v, %v; want listed record %+v", listed.ID, read, err, listed)
+		}
+	}
+}
+
+func TestListRejectsInvalidDirectoryIDs(t *testing.T) {
+	for _, id := range []string{`z\invalid`, " \t"} {
+		t.Run(id, func(t *testing.T) {
+			root := t.TempDir()
+			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
+			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n", id)
+			writeListREADME(t, root, id, content)
+			records, err := List(root)
+			_, readErr := Read(root, id)
+			if err == nil || readErr == nil || err.Error() != readErr.Error() || !strings.Contains(err.Error(), "invalid experiment ID") {
+				t.Fatalf("List error = %v, Read error = %v; want same invalid ID error", err, readErr)
+			}
+			if len(records) != 0 {
+				t.Fatalf("returned partial results: %+v", records)
+			}
+		})
+	}
+}

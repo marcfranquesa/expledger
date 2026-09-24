@@ -39,6 +39,9 @@ func List(root string) ([]experiment.Record, error) {
 		if !entry.IsDir() {
 			continue
 		}
+		if err := validateID(entry.Name()); err != nil {
+			return nil, err
+		}
 		record, err := readRecord(project, entry.Name())
 		if err != nil {
 			return nil, err
