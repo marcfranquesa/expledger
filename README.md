@@ -64,4 +64,4 @@ go run ./cmd/expledger --help
 
 The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree and resolves the Git root in a shared pre-run hook, `help.go` holds help text, and `new.go` handles experiment creation using the resolved path. `internal/experiment` handles directory creation and README encoding and parsing. Tests live beside the code they exercise.
 
-Front matter contains one YAML mapping with explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.
+Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

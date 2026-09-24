@@ -43,6 +43,9 @@ func Parse(data []byte) (Record, error) {
 	}
 	fields := node.Content[0].Content
 	for i := 0; i < len(fields); i += 2 {
+		if fields[i].Kind != yaml.ScalarNode || fields[i].Tag != "!!str" {
+			return Record{}, errors.New("metadata keys must be strings")
+		}
 		key, value := fields[i].Value, fields[i+1]
 		switch key {
 		case "id", "title":
