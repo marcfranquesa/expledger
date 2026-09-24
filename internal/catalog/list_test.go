@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,9 +11,9 @@ import (
 
 func TestList(t *testing.T) {
 	root := t.TempDir()
-	writeListREADME(t, root, "a-older", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n# Baseline\n")
-	writeListREADME(t, root, "m-newer", "---\nid: 20260924-improved\ntitle: Improved model\nbased_on: [20260920-baseline, 20260919-reference]\n---\n# Findings\n")
-	writeListREADME(t, root, "z-oldest", "---\nid: 20260919-reference\ntitle: Reference\n---\n")
+	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n# Baseline\n")
+	writeListREADME(t, root, "20260924-improved", "---\nid: 20260924-improved\ntitle: Improved model\nbased_on: [20260920-baseline, 20260919-reference]\n---\n# Findings\n")
+	writeListREADME(t, root, "20260919-reference", "---\nid: 20260919-reference\ntitle: Reference\n---\n")
 
 	records, err := List(root)
 	if err != nil {
@@ -65,8 +66,8 @@ func TestListEmpty(t *testing.T) {
 
 func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 	root := t.TempDir()
-	writeListREADME(t, root, "baseline", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n")
-	writeListREADME(t, root, filepath.Join("baseline", "artifacts"), "not experiment metadata")
+	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\n---\n")
+	writeListREADME(t, root, filepath.Join("20260920-baseline", "artifacts"), "not experiment metadata")
 	if err := os.WriteFile(filepath.Join(root, "experiments", "README.md"), []byte("loose notes"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +84,7 @@ func TestListInvalidREADME(t *testing.T) {
 	for _, content := range []string{"", "not front matter", "---\nid: missing-title\n---\n"} {
 		t.Run(content, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: baseline\ntitle: Baseline\n---\n")
+			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Baseline\n---\n")
 			if content == "" {
 				if err := os.Mkdir(filepath.Join(root, "experiments", "z-invalid"), 0755); err != nil {
 					t.Fatal(err)
@@ -138,6 +139,35 @@ func TestListRejectsREADMEOutsideProject(t *testing.T) {
 	}
 	if _, err := List(root); err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "linked", "README.md")) {
 		t.Fatalf("error = %v, want an error at the escaped README path", err)
+	}
+}
+
+func TestListRejectsMismatchedIDs(t *testing.T) {
+	for _, id := range []string{"different", "Z-folder", "z-folder ", "a-valid"} {
+		t.Run(id, func(t *testing.T) {
+			root := t.TempDir()
+			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\n---\n")
+			// Reusing a-valid also checks duplicate metadata in different folders.
+			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\n---\n# Keep these notes\n", id)
+			writeListREADME(t, root, "z-folder", content)
+			readme := filepath.Join("experiments", "z-folder", "README.md")
+			records, err := List(root)
+			if err == nil {
+				t.Fatal("accepted mismatched ID")
+			}
+			for _, want := range []string{readme, fmt.Sprintf("%q", id), `"z-folder"`} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %v, want %q", err, want)
+				}
+			}
+			if len(records) != 0 {
+				t.Fatalf("returned partial results: %+v", records)
+			}
+			data, err := os.ReadFile(filepath.Join(root, readme))
+			if err != nil || string(data) != content {
+				t.Fatalf("List changed README: data=%q, err=%v", data, err)
+			}
+		})
 	}
 }
 

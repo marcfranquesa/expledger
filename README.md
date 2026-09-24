@@ -42,7 +42,7 @@ expledger new --help
 
 Running `expledger` without arguments shows help. Help works outside a Git repository. Experiment commands resolve the Git working tree root before running and report an error outside a repository.
 
-The README contains YAML `id`, `title`, and `created_at` fields, followed by Markdown sections for the hypothesis, method, and finding. The ID and creation time stay fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
+The README contains YAML `id`, `title`, and `created_at` fields, followed by Markdown sections for the hypothesis, method, and finding. The YAML `id` must exactly match the experiment folder name, including case. The ID and creation time stay fixed; the title and prose can be edited. An optional `based_on` list refers to parent experiment IDs:
 
 ```yaml
 ---
@@ -56,13 +56,13 @@ based_on:
 
 `created_at` records creation time as an RFC3339 timestamp in UTC, preserving fractional seconds. Older records may omit it; their creation time remains unknown and is not filled in when read or re-encoded. The date in the experiment ID still uses local time.
 
-`based_on` describes experiment ancestry. Parent experiment directories passed with `--based-on` must already exist in the working tree. References are not checked for cycles. Independent experiments omit this field. There is no status field.
+`based_on` describes experiment ancestry. Parent IDs passed with `--based-on` are resolved from validated README metadata before any files are created. Missing or invalid records anywhere in the catalog block parent lookup. References are not checked for cycles. Independent experiments omit this field. There is no status field.
 
 ```sh
 expledger list
 ```
 
-This reads the README in each experiment directory and prints an ID/title table. A missing or empty `experiments/` directory reports "No experiments found." Missing or malformed experiment READMEs report an error with the file path. Files and symlinked directories directly under `experiments/` are ignored; experiment artifacts are not scanned recursively.
+This reads the README in each experiment directory and prints an ID/title table. A missing or empty `experiments/` directory reports "No experiments found." Missing or malformed experiment READMEs report an error with the file path. ID mismatches report the README path, YAML ID, and expected folder name without modifying files. Files and symlinked directories directly under `experiments/` are ignored; experiment artifacts are not scanned recursively.
 
 ## Agent skill
 
@@ -94,7 +94,7 @@ go run ./cmd/expledger --help
 The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
 
 - `internal/cli`: command arguments, orchestration, and terminal output.
-- `internal/catalog`: experiment discovery and lookup (`List` and `Exists`).
+- `internal/catalog`: validated discovery and lookup (`List` and `Lookup`), plus directory-existence checks (`Exists`) for overwrite protection.
 - `internal/experiment`: individual records, IDs, creation, and YAML parsing.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

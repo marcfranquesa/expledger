@@ -39,12 +39,8 @@ func newExperimentCommand(app *application) *cobra.Command {
 				return fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
 			}
 			for _, parent := range opts.BasedOn {
-				exists, err := catalog.Exists(app.repoRoot, parent)
-				if err != nil {
+				if _, err := catalog.Lookup(app.repoRoot, parent); err != nil {
 					return fmt.Errorf("check parent experiment %q: %w", parent, err)
-				}
-				if !exists {
-					return fmt.Errorf("parent experiment %q does not exist", parent)
 				}
 			}
 			dir, err := experiment.Create(app.repoRoot, args[0], app.now, opts)

@@ -13,6 +13,7 @@ import (
 )
 
 // List reads immediate experiment directories and orders records by descending ID.
+// Each README's ID must exactly match its directory name.
 // A missing experiments directory is an empty list.
 func List(root string) ([]experiment.Record, error) {
 	project, err := os.OpenRoot(root)
@@ -47,6 +48,9 @@ func List(root string) ([]experiment.Record, error) {
 		record, err := experiment.Parse(data)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", readme, err)
+		}
+		if record.ID != entry.Name() {
+			return nil, fmt.Errorf("invalid %s: YAML id %q must match folder name %q", readme, record.ID, entry.Name())
 		}
 		records = append(records, record)
 	}

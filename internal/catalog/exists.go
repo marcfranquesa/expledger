@@ -10,6 +10,7 @@ import (
 
 // Exists reports whether experiments/id is a directory, without reading its README.
 // IDs must be single directory names; files and symlinks return errors.
+// Use Lookup when a valid experiment record is required.
 func Exists(root, id string) (bool, error) {
 	if strings.TrimSpace(id) == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\\x00") {
 		return false, fmt.Errorf("invalid experiment ID %q: use a single nonempty directory name", id)

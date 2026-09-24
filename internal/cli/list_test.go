@@ -19,9 +19,9 @@ func TestListFromNestedDirectory(t *testing.T) {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeListRecord(t, root, "a", experiment.Record{ID: "20260922-baseline", Title: "Baseline"})
-	writeListRecord(t, root, "b", experiment.Record{ID: "20260924-latest", Title: "Latest result"})
-	writeListRecord(t, root, "c", experiment.Record{ID: "20260923-middle\n ", Title: "Middle\t title\ncontinued"})
+	writeListRecord(t, root, "20260922-baseline", experiment.Record{ID: "20260922-baseline", Title: "Baseline"})
+	writeListRecord(t, root, "20260924-latest", experiment.Record{ID: "20260924-latest", Title: "Latest result"})
+	writeListRecord(t, root, "20260923-middle", experiment.Record{ID: "20260923-middle", Title: "Middle\t title\ncontinued"})
 
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"list"}, cwd, time.Time{}, &stdout); err != nil {
@@ -84,7 +84,7 @@ func TestListInvalidReadme(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
-			writeListRecord(t, root, "a-valid", experiment.Record{ID: "20260924-valid", Title: "Valid"})
+			writeListRecord(t, root, "20260924-valid", experiment.Record{ID: "20260924-valid", Title: "Valid"})
 			dir := filepath.Join(root, "experiments", "z-invalid")
 			if err := os.Mkdir(dir, 0o755); err != nil {
 				t.Fatal(err)
@@ -103,6 +103,28 @@ func TestListInvalidReadme(t *testing.T) {
 				t.Fatalf("failed list printed partial output: %q", stdout.String())
 			}
 		})
+	}
+}
+
+func TestListRejectsMismatchedID(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	writeListRecord(t, root, "20260922-valid", experiment.Record{ID: "20260922-valid", Title: "Valid"})
+	const folder = "20260924-renamed"
+	const id = "20260924-original"
+	writeListRecord(t, root, folder, experiment.Record{ID: id, Title: "Renamed experiment"})
+	var stdout bytes.Buffer
+	err := cli.Run([]string{"list"}, root, time.Time{}, &stdout)
+	if err == nil {
+		t.Fatal("expected error for experiment ID differing from its folder")
+	}
+	for _, want := range []string{filepath.Join("experiments", folder, "README.md"), folder, id} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %q, want %q", err, want)
+		}
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("failed list printed partial output: %q", stdout.String())
 	}
 }
 
