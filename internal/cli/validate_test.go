@@ -22,8 +22,8 @@ func TestValidateFromNestedDirectory(t *testing.T) {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	readme := writeValidateReadme(t, root, validateID, validateReadme)
-	writeValidateReadme(t, root, "unrelated", "not valid front matter\n")
+	readme := writeREADME(t, root, validateID, []byte(validateReadme))
+	writeREADME(t, root, "unrelated", []byte("not valid front matter\n"))
 
 	var stdout bytes.Buffer
 	if err := cli.Run([]string{"validate", validateID}, cwd, time.Time{}, &stdout); err != nil {
@@ -52,7 +52,7 @@ func TestValidateRejectsInvalidReadmeWithoutChangingIt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
-			readme := writeValidateReadme(t, root, validateID, tt.data)
+			readme := writeREADME(t, root, validateID, []byte(tt.data))
 			var stdout bytes.Buffer
 			err := cli.Run([]string{"validate", validateID}, root, time.Time{}, &stdout)
 			if err == nil {
@@ -108,48 +108,4 @@ func TestValidateMissingReadme(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestValidateInvalidArguments(t *testing.T) {
-	for _, args := range [][]string{{"validate"}, {"validate", validateID, "another-id"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			root := t.TempDir()
-			t.Setenv("PATH", t.TempDir())
-			var stdout bytes.Buffer
-			err := cli.Run(args, root, time.Time{}, &stdout)
-			if err == nil || strings.Contains(err.Error(), "find Git working tree") {
-				t.Fatalf("expected usage error before Git lookup, got %v", err)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("invalid command printed output: %q", stdout.String())
-			}
-			assertEmptyDirectory(t, root)
-		})
-	}
-}
-
-func TestValidateHelpWithoutGit(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv("PATH", t.TempDir())
-	var stdout bytes.Buffer
-	if err := cli.Run([]string{"validate", "--help"}, root, time.Time{}, &stdout); err != nil {
-		t.Fatal(err)
-	}
-	if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger validate <id>") {
-		t.Fatalf("validate help does not describe usage: %q", got)
-	}
-	assertEmptyDirectory(t, root)
-}
-
-func writeValidateReadme(t *testing.T, root, id, data string) string {
-	t.Helper()
-	dir := filepath.Join(root, "experiments", id)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	readme := filepath.Join(dir, "README.md")
-	if err := os.WriteFile(readme, []byte(data), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return readme
 }

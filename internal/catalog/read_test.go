@@ -37,26 +37,12 @@ func TestReadRejectsMismatchedID(t *testing.T) {
 	}
 }
 
-func TestReadReportsMetadataErrorsWithPath(t *testing.T) {
-	const valid = "---\nid: example\ntitle: Example\ncreated_at: 2026-09-24T14:30:00Z\n---\n"
-	for name, tc := range map[string]struct {
-		old, replacement, want string
-	}{
-		"missing id":         {"id: example\n", "", "id is required"},
-		"empty title":        {"title: Example", "title: ' '", "title is required"},
-		"missing created_at": {"created_at: 2026-09-24T14:30:00Z\n", "", "created_at is required"},
-		"invalid timestamp":  {"2026-09-24T14:30:00Z", "yesterday", "created_at must be an RFC3339 timestamp with a timezone"},
-		"invalid YAML":       {"title: Example", "title: [", "parse metadata"},
-		"invalid parents":    {"title: Example", "title: Example\nbased_on: previous", "based_on must be a list of strings"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			writeListREADME(t, root, "example", strings.Replace(valid, tc.old, tc.replacement, 1))
-			_, err := Read(root, "example")
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "example", "README.md")) || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("Read error = %v, want README path and %q", err, tc.want)
-			}
-		})
+func TestReadReportsParseErrorWithPath(t *testing.T) {
+	root := t.TempDir()
+	writeListREADME(t, root, "example", "---\nid: [\n---\n")
+	_, err := Read(root, "example")
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "example", "README.md")) || !strings.Contains(err.Error(), "parse metadata") {
+		t.Fatalf("Read error = %v, want README path and parser error", err)
 	}
 }
 

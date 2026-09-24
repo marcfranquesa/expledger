@@ -194,11 +194,5 @@ func writeListRecord(t *testing.T, root, name string, record experiment.Record) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(root, "experiments", name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeREADME(t, root, name, data)
 }
