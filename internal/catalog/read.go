@@ -13,8 +13,8 @@ import (
 // Read loads one experiment's README and requires its ID to match the folder name.
 // It does not read parent experiments or change any files.
 func Read(root, id string) (experiment.Record, error) {
-	if strings.TrimSpace(id) == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\\x00") {
-		return experiment.Record{}, fmt.Errorf("invalid experiment ID %q: use a single nonempty directory name", id)
+	if err := validateID(id); err != nil {
+		return experiment.Record{}, err
 	}
 	project, err := os.OpenRoot(root)
 	if err != nil {
@@ -57,4 +57,11 @@ func readRecord(project *os.Root, id string) (experiment.Record, error) {
 		return experiment.Record{}, fmt.Errorf("invalid %s: YAML id %q must match folder name %q", readme, record.ID, id)
 	}
 	return record, nil
+}
+
+func validateID(id string) error {
+	if strings.TrimSpace(id) == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\\x00") {
+		return fmt.Errorf("invalid experiment ID %q: use a single nonempty directory name", id)
+	}
+	return nil
 }

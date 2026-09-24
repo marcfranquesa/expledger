@@ -47,7 +47,7 @@ func TestReadReportsParseErrorWithPath(t *testing.T) {
 }
 
 func TestReadRejectsInvalidID(t *testing.T) {
-	for _, id := range []string{"", " ", ".", "..", "../outside", "nested/experiment", `nested\experiment`} {
+	for _, id := range []string{"", " ", ".", "..", "../outside", "nested/experiment", `nested\experiment`, "nul\x00id"} {
 		t.Run(id, func(t *testing.T) {
 			if _, err := Read(t.TempDir(), id); err == nil || !strings.Contains(err.Error(), "invalid experiment ID") {
 				t.Fatalf("Read error = %v, want invalid experiment ID", err)
