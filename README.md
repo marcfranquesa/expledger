@@ -56,29 +56,22 @@ based_on:
 
 ## Agent skill
 
-The [ExpLedger skill](skills/expledger/SKILL.md) tells coding agents to use
-ExpLedger whenever they run coding experiments: create a record before running,
-link parent experiments, and document the method, results, and conclusions.
+After installing the CLI, link the [skill](skills/expledger/SKILL.md) from a
+persistent ExpLedger checkout. Run one of these from that checkout:
 
-Install the CLI above first. To set up the skill for a project in Codex, run this
-from your ExpLedger checkout, replacing `/path/to/project` with the target
-repository:
+**Per repository** (replace `/path/to/project`):
 
 ```sh
-mkdir -p "/path/to/project/.agents/skills/expledger"
-cp skills/expledger/SKILL.md "/path/to/project/.agents/skills/expledger/SKILL.md"
+mkdir -p "/path/to/project/.agents/skills"
+ln -s "$PWD/skills/expledger" "/path/to/project/.agents/skills/expledger"
 ```
 
-This copies the skill into Codex's [repository skill directory](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
-You can invoke it explicitly with `$expledger`. To make its use a repository
-convention, add this to the target project's `AGENTS.md`:
+**Global** (all your repositories):
 
-```markdown
-Use the expledger skill whenever running coding experiments.
+```sh
+mkdir -p "$HOME/.agents/skills"
+ln -s "$PWD/skills/expledger" "$HOME/.agents/skills/expledger"
 ```
-
-For other agents that support `SKILL.md`, copy the skill into their documented
-skill directory and add the same convention to their project instructions.
 
 ## Development
 
