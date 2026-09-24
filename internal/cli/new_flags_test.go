@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -114,23 +115,65 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 }
 
 func TestNewRejectsMissingParent(t *testing.T) {
+	for _, withExistingParent := range []bool{false, true} {
+		name := "only parent missing"
+		if withExistingParent {
+			name = "second parent missing"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			git(t, root, "init", "--quiet")
+			const parent = "20260920-missing"
+			args := []string{"new", "my-idea"}
+			if withExistingParent {
+				createMetadataParent(t, root, "baseline", 20)
+				args = append(args, "--based-on", "20260920-baseline")
+			}
+			args = append(args, "--based-on", parent)
+			var stdout bytes.Buffer
+			err := cli.Run(args, root, metadataTestTime(), &stdout)
+			if err == nil || !strings.Contains(err.Error(), parent) {
+				t.Fatalf("expected error naming missing parent %q, got %v", parent, err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("failed command printed output: %q", stdout.String())
+			}
+			checkDir, wantEntry := root, ".git"
+			if withExistingParent {
+				checkDir = filepath.Join(root, "experiments")
+				wantEntry = "20260920-baseline"
+			}
+			entries, err := os.ReadDir(checkDir)
+			if err != nil || len(entries) != 1 || entries[0].Name() != wantEntry {
+				t.Fatalf("missing parent unexpectedly created files: entries=%v, err=%v", entries, err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
 	git(t, root, "init", "--quiet")
-	const parent = "20260920-missing"
+	dir, err := experiment.Create(root, "my-idea", metadataTestTime(), experiment.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(dir, "README.md")
+	notes := []byte("# Existing research notes\n")
+	if err := os.WriteFile(readme, notes, 0644); err != nil {
+		t.Fatal(err)
+	}
 	var stdout bytes.Buffer
-	err := cli.Run([]string{"new", "my-idea", "--based-on", parent}, root, metadataTestTime(), &stdout)
-	if err == nil || !strings.Contains(err.Error(), parent) {
-		t.Fatalf("expected error naming missing parent %q, got %v", parent, err)
+	err = cli.Run([]string{"new", "my-idea"}, root, metadataTestTime(), &stdout)
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("duplicate error = %v, want os.ErrExist", err)
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("failed command printed output: %q", stdout.String())
 	}
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 1 || entries[0].Name() != ".git" {
-		t.Fatalf("missing parent unexpectedly created files: %v", entries)
+	data, err := os.ReadFile(readme)
+	if err != nil || !bytes.Equal(data, notes) {
+		t.Fatalf("duplicate changed existing notes: data=%q, err=%v", data, err)
 	}
 }
 

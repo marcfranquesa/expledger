@@ -5,7 +5,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/marcfranquesa/expledger/internal/experiment"
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ func listExperimentsCommand(app *application) *cobra.Command {
 		Long:  listDetails,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			records, err := experiment.List(app.repoRoot)
+			records, err := catalog.List(app.repoRoot)
 			if err != nil {
 				return err
 			}

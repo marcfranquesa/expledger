@@ -91,6 +91,10 @@ go vet ./...
 go run ./cmd/expledger --help
 ```
 
-The executable entry point is in `cmd/expledger`. `internal/cli` uses Cobra: `cli.go` assembles the command tree and resolves the Git root in a shared pre-run hook, `help.go` holds help text, and `new.go` and `list.go` handle their commands. `internal/experiment` handles experiment creation, discovery, and README encoding and parsing. Tests live beside the code they exercise.
+The executable entry point is in `cmd/expledger`. Tests live beside the code they exercise.
+
+- `internal/cli`: command arguments, orchestration, and terminal output.
+- `internal/catalog`: experiment discovery and lookup (`List` and `Exists`).
+- `internal/experiment`: individual records, IDs, creation, and YAML parsing.
 
 Front matter contains one YAML mapping with string keys and explicit values; aliases and merge keys are unsupported. The parser preserves the Markdown body byte for byte and retains unknown metadata values. Re-encoding metadata normalizes YAML formatting, and YAML comments are not guaranteed to survive. The `new` command only creates files; it never rewrites an existing README.

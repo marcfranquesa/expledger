@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -80,14 +79,9 @@ func TestCreateRejectsSymlink(t *testing.T) {
 	}
 }
 
-func TestCreateWithExistingParents(t *testing.T) {
+func TestCreateStoresParentMetadata(t *testing.T) {
 	root := t.TempDir()
 	parents := []string{"baseline", "reference"}
-	for _, parent := range parents {
-		if err := os.MkdirAll(filepath.Join(root, "experiments", parent), 0755); err != nil {
-			t.Fatal(err)
-		}
-	}
 	dir, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents})
 	if err != nil {
 		t.Fatal(err)
@@ -105,34 +99,14 @@ func TestCreateWithExistingParents(t *testing.T) {
 	}
 }
 
-func TestCreateRejectsMissingParentsBeforeWriting(t *testing.T) {
-	for _, withExistingParent := range []bool{false, true} {
-		name := "missing only parent"
-		if withExistingParent {
-			name = "missing second parent"
-		}
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			parents := []string{"missing-parent"}
-			if withExistingParent {
-				if err := os.MkdirAll(filepath.Join(root, "experiments", "baseline"), 0755); err != nil {
-					t.Fatal(err)
-				}
-				parents = []string{"baseline", "missing-parent"}
-			}
-			if _, err := Create(root, "improved", time.Now(), CreateOptions{BasedOn: parents}); err == nil || !strings.Contains(err.Error(), `parent experiment "missing-parent" does not exist`) {
-				t.Fatalf("error = %v, want missing parent ID", err)
-			}
-			checkDir := root
-			wantEntries := 0
-			if withExistingParent {
-				checkDir = filepath.Join(root, "experiments")
-				wantEntries = 1
-			}
-			entries, err := os.ReadDir(checkDir)
-			if err != nil || len(entries) != wantEntries {
-				t.Fatalf("invalid parent changed project: entries=%v, err=%v", entries, err)
-			}
-		})
+func TestNewIDUsesProvidedLocation(t *testing.T) {
+	now := time.Date(2026, 9, 24, 23, 59, 0, 0, time.FixedZone("local", -4*60*60))
+	id, err := NewID("baseline", now)
+	if err != nil || id != "20260924-baseline" {
+		t.Fatalf("local ID = %q, %v; want 20260924-baseline", id, err)
+	}
+	id, err = NewID("baseline", now.UTC())
+	if err != nil || id != "20260925-baseline" {
+		t.Fatalf("UTC ID = %q, %v; want 20260925-baseline", id, err)
 	}
 }

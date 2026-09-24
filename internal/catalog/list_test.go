@@ -1,4 +1,4 @@
-package experiment
+package catalog
 
 import (
 	"os"

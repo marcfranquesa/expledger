@@ -1,4 +1,5 @@
-package experiment
+// Package catalog discovers and locates experiments in a project.
+package catalog
 
 import (
 	"errors"
@@ -7,11 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 // List reads immediate experiment directories and orders records by descending ID.
 // A missing experiments directory is an empty list.
-func List(root string) ([]Record, error) {
+func List(root string) ([]experiment.Record, error) {
 	project, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("open project directory: %w", err)
@@ -31,7 +34,7 @@ func List(root string) ([]Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read experiments directory: %w", err)
 	}
-	var records []Record
+	var records []experiment.Record
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -41,7 +44,7 @@ func List(root string) ([]Record, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", readme, err)
 		}
-		record, err := Parse(data)
+		record, err := experiment.Parse(data)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", readme, err)
 		}

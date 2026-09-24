@@ -19,13 +19,21 @@ type CreateOptions struct {
 	BasedOn []string
 }
 
-// Create adds an experiment under root, using the date in now's location.
-// Parent experiment directories must exist. Existing directories are never overwritten.
-func Create(root, slug string, now time.Time, opts CreateOptions) (string, error) {
+// NewID validates slug and prefixes it with the date in now's location.
+func NewID(slug string, now time.Time) (string, error) {
 	if !slugPattern.MatchString(slug) {
 		return "", fmt.Errorf("invalid slug %q: use lowercase letters, digits, and single hyphens", slug)
 	}
-	id := now.Format("20060102") + "-" + slug
+	return now.Format("20060102") + "-" + slug, nil
+}
+
+// Create adds an experiment under root, using the date in now's location.
+// Callers validate parent references. Existing directories are never overwritten.
+func Create(root, slug string, now time.Time, opts CreateOptions) (string, error) {
+	id, err := NewID(slug, now)
+	if err != nil {
+		return "", err
+	}
 	title := opts.Title
 	if title == "" {
 		title = strings.ReplaceAll(slug, "-", " ")
@@ -41,23 +49,6 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	if err != nil {
 		return "", err
 	}
-	exists, err := Exists(root, id)
-	if err != nil {
-		return "", err
-	}
-	if exists {
-		return "", fmt.Errorf("experiment %q already exists: %w", id, os.ErrExist)
-	}
-	for _, parent := range opts.BasedOn {
-		exists, err := Exists(root, parent)
-		if err != nil {
-			return "", fmt.Errorf("check parent experiment %q: %w", parent, err)
-		}
-		if !exists {
-			return "", fmt.Errorf("parent experiment %q does not exist", parent)
-		}
-	}
-
 	fs, err := os.OpenRoot(root)
 	if err != nil {
 		return "", fmt.Errorf("open project directory: %w", err)
