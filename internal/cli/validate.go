@@ -19,7 +19,7 @@ func validateExperimentCommand(app *application) *cobra.Command {
 			if _, err := catalog.Read(app.repoRoot, args[0]); err != nil {
 				return err
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Valid: %s\n", filepath.Join("experiments", args[0], "README.md"))
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Valid: %s\n", filepath.Join("experiments", args[0], "expledger.yaml"))
 			return err
 		},
 	}

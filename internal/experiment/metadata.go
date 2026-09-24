@@ -1,4 +1,4 @@
-// Package experiment defines experiment records and their README format.
+// Package experiment defines experiment records and their YAML metadata format.
 package experiment
 
 import (
@@ -16,31 +16,30 @@ import (
 // time.Parse also accepts single-digit hours, comma fractions, and out-of-range offsets.
 var createdAtPattern = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$`)
 
-// Record holds structured metadata and the unchanged Markdown body.
+// Schema identifies the supported ExpLedger metadata format.
+const Schema = "expledger/v1"
+
+// Record holds an experiment's structured metadata.
 // Extra retains metadata fields added by people or later versions of ExpLedger.
 type Record struct {
+	Schema    string               `yaml:"schema"`
 	ID        string               `yaml:"id"`
 	Title     string               `yaml:"title"`
 	CreatedAt time.Time            `yaml:"created_at"`
 	BasedOn   []string             `yaml:"based_on,omitempty"`
 	Extra     map[string]yaml.Node `yaml:",inline"`
-	Body      []byte               `yaml:"-"`
 }
 
-// Parse reads YAML front matter delimited by --- lines, followed by Markdown.
+// Parse reads a single YAML metadata document with the supported schema.
 func Parse(data []byte) (Record, error) {
-	header, body, err := splitFrontMatter(data)
-	if err != nil {
-		return Record{}, err
-	}
 	var node yaml.Node
-	decoder := yaml.NewDecoder(bytes.NewReader(header))
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&node); err != nil {
 		return Record{}, fmt.Errorf("parse metadata: %w", err)
 	}
 	var trailing yaml.Node
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return Record{}, errors.New("front matter must contain exactly one YAML document")
+		return Record{}, errors.New("metadata must contain exactly one YAML document")
 	}
 	if len(node.Content) != 1 || node.Content[0].Kind != yaml.MappingNode {
 		return Record{}, errors.New("metadata must be a YAML mapping")
@@ -55,7 +54,7 @@ func Parse(data []byte) (Record, error) {
 		}
 		key, value := fields[i].Value, fields[i+1]
 		switch key {
-		case "id", "title":
+		case "schema", "id", "title":
 			if value.Tag != "!!str" {
 				return Record{}, fmt.Errorf("%s must be a string", key)
 			}
@@ -84,11 +83,10 @@ func Parse(data []byte) (Record, error) {
 	if err := record.validate(); err != nil {
 		return Record{}, err
 	}
-	record.Body = body
 	return record, nil
 }
 
-// Marshal encodes metadata and appends the Markdown body byte for byte.
+// Marshal encodes one YAML metadata document.
 // YAML formatting and comments are not retained when metadata is re-encoded.
 func (r Record) Marshal() ([]byte, error) {
 	if err := r.validate(); err != nil {
@@ -103,9 +101,7 @@ func (r Record) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encode metadata: %w", err)
 	}
-	data := append([]byte("---\n"), metadata...)
-	data = append(data, []byte("---\n")...)
-	return append(data, r.Body...), nil
+	return metadata, nil
 }
 
 func withExplicitNulls(node yaml.Node) yaml.Node {
@@ -125,6 +121,12 @@ func withExplicitNulls(node yaml.Node) yaml.Node {
 }
 
 func (r Record) validate() error {
+	if r.Schema == "" {
+		return errors.New("schema is required; expected " + Schema)
+	}
+	if r.Schema != Schema {
+		return fmt.Errorf("unsupported schema %q; expected %s", r.Schema, Schema)
+	}
 	if strings.TrimSpace(r.ID) == "" {
 		return errors.New("id is required and must be a nonempty string")
 	}
@@ -145,7 +147,7 @@ func (r Record) validate() error {
 			return errors.New("based_on entries must be nonempty strings")
 		}
 	}
-	for _, key := range []string{"id", "title", "created_at", "based_on"} {
+	for _, key := range []string{"schema", "id", "title", "created_at", "based_on"} {
 		if _, exists := r.Extra[key]; exists {
 			return fmt.Errorf("extra metadata cannot override %s", key)
 		}
@@ -169,23 +171,4 @@ func validateYAML(node *yaml.Node) error {
 		}
 	}
 	return nil
-}
-
-func splitFrontMatter(data []byte) ([]byte, []byte, error) {
-	first, rest, found := bytes.Cut(data, []byte("\n"))
-	if !found || string(bytes.TrimSuffix(first, []byte("\r"))) != "---" {
-		return nil, nil, errors.New("README must begin with a --- line")
-	}
-	start := len(data) - len(rest)
-	for offset := start; offset < len(data); {
-		line, tail, hasNewline := bytes.Cut(data[offset:], []byte("\n"))
-		if string(bytes.TrimSuffix(line, []byte("\r"))) == "---" {
-			return data[start:offset], tail, nil
-		}
-		if !hasNewline {
-			break
-		}
-		offset = len(data) - len(tail)
-	}
-	return nil, nil, errors.New("YAML front matter is missing its closing --- line")
 }

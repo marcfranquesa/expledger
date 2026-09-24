@@ -14,7 +14,6 @@ func TestRenderInMemory(t *testing.T) {
 		{
 			ID: "first # record", Title: "<script>Trial & result</script>",
 			CreatedAt: time.Date(2026, 9, 24, 12, 30, 0, 123456789, time.FixedZone("local", -4*60*60)),
-			Body:      []byte("Private experiment notes"),
 		},
 		{
 			ID: "second", Title: "Later timestamp, supplied second",
@@ -40,10 +39,8 @@ func TestRenderInMemory(t *testing.T) {
 			t.Errorf("page missing %q", want)
 		}
 	}
-	for _, unwanted := range []string{"<script>", "Private experiment notes"} {
-		if strings.Contains(page, unwanted) {
-			t.Errorf("page contains %q", unwanted)
-		}
+	if strings.Contains(page, "<script>") {
+		t.Error("page contains an unescaped script tag")
 	}
 	if strings.Index(page, "first # record") >= strings.Index(page, "Later timestamp, supplied second") {
 		t.Fatal("renderer changed the supplied record order")

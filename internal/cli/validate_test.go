@@ -14,7 +14,7 @@ import (
 
 const validateID = "20260924-selected"
 
-const validateReadme = "---\nid: " + validateID + "\ntitle: Selected experiment\ncreated_at: 2026-09-24T12:00:00Z\ncustom: keep-me\n---\n\nHuman notes with trailing spaces.  \n"
+const validateMetadata = "schema: expledger/v1\nid: " + validateID + "\ntitle: Selected experiment\ncreated_at: 2026-09-24T12:00:00Z\ncustom: keep-me\n"
 
 func TestValidateFromNestedDirectory(t *testing.T) {
 	root := t.TempDir()
@@ -23,43 +23,43 @@ func TestValidateFromNestedDirectory(t *testing.T) {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	readme := writeREADME(t, root, validateID, []byte(validateReadme))
-	writeREADME(t, root, "unrelated", []byte("not valid front matter\n"))
+	metadata := writeMetadata(t, root, validateID, []byte(validateMetadata))
+	writeMetadata(t, root, "unrelated", []byte("invalid metadata\n"))
 
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"validate", validateID}, cwd, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/README.md\n"; got != want {
+	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/expledger.yaml\n"; got != want {
 		t.Fatalf("validate output = %q, want %q", got, want)
 	}
-	data, err := os.ReadFile(readme)
-	if err != nil || string(data) != validateReadme {
-		t.Fatalf("validation changed README: data=%q, err=%v", data, err)
+	data, err := os.ReadFile(metadata)
+	if err != nil || string(data) != validateMetadata {
+		t.Fatalf("validation changed metadata: data=%q, err=%v", data, err)
 	}
 }
 
-func TestValidateRejectsInvalidReadmeWithoutChangingIt(t *testing.T) {
+func TestValidateRejectsInvalidMetadataWithoutChangingIt(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
 		data   string
 		reason string
 	}{
-		{name: "missing front matter", data: "# Human notes\n", reason: "---"},
-		{name: "invalid YAML", data: "---\nid: [\n---\n", reason: "metadata"},
-		{name: "id mismatch", data: strings.Replace(validateReadme, validateID, "20260924-other", 1), reason: "20260924-other"},
-		{name: "id must match exactly", data: strings.Replace(validateReadme, validateID, "'"+validateID+" '", 1), reason: "id"},
+		{name: "missing schema", data: strings.Replace(validateMetadata, "schema: expledger/v1\n", "", 1), reason: "schema"},
+		{name: "invalid YAML", data: "schema: expledger/v1\nid: [\n", reason: "metadata"},
+		{name: "id mismatch", data: strings.Replace(validateMetadata, validateID, "20260924-other", 1), reason: "20260924-other"},
+		{name: "id must match exactly", data: strings.Replace(validateMetadata, validateID, "'"+validateID+" '", 1), reason: "id"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			git(t, root, "init", "--quiet")
-			readme := writeREADME(t, root, validateID, []byte(tt.data))
+			metadata := writeMetadata(t, root, validateID, []byte(tt.data))
 			var stdout bytes.Buffer
 			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
-			for _, want := range []string{filepath.Join("experiments", validateID, "README.md"), tt.reason} {
+			for _, want := range []string{filepath.Join("experiments", validateID, "expledger.yaml"), tt.reason} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("validation error %q does not contain %q", err, want)
 				}
@@ -67,19 +67,19 @@ func TestValidateRejectsInvalidReadmeWithoutChangingIt(t *testing.T) {
 			if stdout.Len() != 0 {
 				t.Errorf("failed validation printed output: %q", stdout.String())
 			}
-			data, err := os.ReadFile(readme)
+			data, err := os.ReadFile(metadata)
 			if err != nil || string(data) != tt.data {
-				t.Fatalf("failed validation changed README: data=%q, err=%v", data, err)
+				t.Fatalf("failed validation changed metadata: data=%q, err=%v", data, err)
 			}
 		})
 	}
 }
 
-func TestValidateMissingReadme(t *testing.T) {
+func TestValidateMissingMetadata(t *testing.T) {
 	for _, existingFolder := range []bool{false, true} {
 		name := "missing folder"
 		if existingFolder {
-			name = "missing README"
+			name = "missing metadata"
 		}
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -94,7 +94,7 @@ func TestValidateMissingReadme(t *testing.T) {
 			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
 			wantPath := filepath.Join("experiments", validateID)
 			if existingFolder {
-				wantPath = filepath.Join(wantPath, "README.md")
+				wantPath = filepath.Join(wantPath, "expledger.yaml")
 			}
 			if err == nil || !strings.Contains(err.Error(), wantPath) {
 				t.Fatalf("expected error naming missing path %s, got %v", wantPath, err)

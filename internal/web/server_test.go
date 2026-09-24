@@ -53,6 +53,14 @@ func TestExperiments(t *testing.T) {
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Errorf("Content-Type = %q", got)
 	}
+	for _, filename := range []string{"README.md", "expledger.yaml"} {
+		response := httptest.NewRecorder()
+		path := "/experiments/20260924-baseline/" + filename
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		if response.Code != http.StatusNotFound {
+			t.Errorf("experiment file %s was served: status %d", path, response.Code)
+		}
+	}
 }
 
 func TestEscapesMetadataAndFolderURL(t *testing.T) {
@@ -64,8 +72,8 @@ func TestEscapesMetadataAndFolderURL(t *testing.T) {
 	if err := os.Rename(filepath.Join(root, "experiments", "20260924-long-title"), folder); err != nil {
 		t.Fatal(err)
 	}
-	readme := filepath.Join(folder, "README.md")
-	data, err := os.ReadFile(readme)
+	metadata := filepath.Join(folder, "expledger.yaml")
+	data, err := os.ReadFile(metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +86,7 @@ func TestEscapesMetadataAndFolderURL(t *testing.T) {
 			lines[i] = "id: actual folder & notes"
 		}
 	}
-	if err := os.WriteFile(readme, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+	if err := os.WriteFile(metadata, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "research/next"})
@@ -104,13 +112,13 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
 		t.Fatalf("initial response: %d %s", response.Code, response.Body)
 	}
-	readme := filepath.Join(root, "experiments", "20260924-baseline", "README.md")
-	data, err := os.ReadFile(readme)
+	metadata := filepath.Join(root, "experiments", "20260924-baseline", "expledger.yaml")
+	data, err := os.ReadFile(metadata)
 	if err != nil {
 		t.Fatal(err)
 	}
 	updated := strings.Replace(string(data), "title: Baseline model", "title: Updated baseline", 1)
-	if err := os.WriteFile(readme, []byte(updated), 0o644); err != nil {
+	if err := os.WriteFile(metadata, []byte(updated), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	response = httptest.NewRecorder()
@@ -120,14 +128,14 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	}
 }
 
-func TestRefreshRecoversAfterREADMERepair(t *testing.T) {
+func TestRefreshRecoversAfterMetadataRepair(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "experiments", "example")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	readme := filepath.Join(dir, "README.md")
-	if err := os.WriteFile(readme, []byte("invalid README"), 0o644); err != nil {
+	metadata := filepath.Join(dir, "expledger.yaml")
+	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	handler := web.NewHandler(root, web.PageOptions{
@@ -135,20 +143,20 @@ func TestRefreshRecoversAfterREADMERepair(t *testing.T) {
 	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "README.md") {
-		t.Fatalf("invalid README response: %d %s", response.Code, response.Body)
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "expledger.yaml") {
+		t.Fatalf("invalid metadata response: %d %s", response.Code, response.Body)
 	}
 	if response.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("invalid README response may be cached")
+		t.Fatal("invalid metadata response may be cached")
 	}
-	content := "---\nid: example\ntitle: Repaired example\ncreated_at: 2026-09-24T12:00:00Z\n---\n"
-	if err := os.WriteFile(readme, []byte(content), 0o644); err != nil {
+	content := "schema: expledger/v1\nid: example\ntitle: Repaired example\ncreated_at: 2026-09-24T12:00:00Z\n"
+	if err := os.WriteFile(metadata, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Repaired example") {
-		t.Fatalf("repaired README response: %d %s", response.Code, response.Body)
+		t.Fatalf("repaired metadata response: %d %s", response.Code, response.Body)
 	}
 }
 
@@ -163,7 +171,7 @@ func TestEmptyCatalogAndRoutes(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No experiments yet") || !strings.Contains(response.Body.String(), "expledger new my-idea") {
 		t.Fatalf("empty catalog response: %d %s", response.Code, response.Body)
 	}
-	for _, path := range []string{"/README.md", "/experiments/one/README.md", "/missing"} {
+	for _, path := range []string{"/README.md", "/experiments/one/README.md", "/experiments/one/expledger.yaml", "/missing"} {
 		t.Run(path, func(t *testing.T) {
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))

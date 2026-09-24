@@ -19,9 +19,8 @@ func TestList(t *testing.T) {
 	if len(records) != 3 {
 		t.Fatalf("records = %+v, want three experiments", records)
 	}
-	if records[0].ID != "20260924-long-title" || records[0].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" ||
-		!strings.Contains(string(records[0].Body), "Long-title fixture body") {
-		t.Fatalf("newest record = %+v, want long title and its body", records[0])
+	if records[0].ID != "20260924-long-title" || records[0].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" {
+		t.Fatalf("newest record = %+v, want long title", records[0])
 	}
 	if records[1].ID != "20260924-variant" || records[1].Title != "Lower learning rate" ||
 		!reflect.DeepEqual(records[1].BasedOn, []string{"20260924-baseline"}) {
@@ -35,10 +34,10 @@ func TestList(t *testing.T) {
 
 func TestListOrdersTimestampInstants(t *testing.T) {
 	root := t.TempDir()
-	writeListREADME(t, root, "a-older", "---\nid: a-older\ntitle: Older\ncreated_at: 2026-09-24T12:00:00+02:00\n---\n")
-	writeListREADME(t, root, "b-newer", "---\nid: b-newer\ntitle: Newer\ncreated_at: 2026-09-24T11:00:00Z\n---\n")
-	writeListREADME(t, root, "c-same-instant", "---\nid: c-same-instant\ntitle: Same instant\ncreated_at: 2026-09-24T07:00:00-04:00\n---\n")
-	writeListREADME(t, root, "d-fractionally-newest", "---\nid: d-fractionally-newest\ntitle: Fractionally newest\ncreated_at: 2026-09-24T11:00:00.000000001Z\n---\n")
+	writeMetadata(t, root, "a-older", "schema: expledger/v1\nid: a-older\ntitle: Older\ncreated_at: 2026-09-24T12:00:00+02:00\n")
+	writeMetadata(t, root, "b-newer", "schema: expledger/v1\nid: b-newer\ntitle: Newer\ncreated_at: 2026-09-24T11:00:00Z\n")
+	writeMetadata(t, root, "c-same-instant", "schema: expledger/v1\nid: c-same-instant\ntitle: Same instant\ncreated_at: 2026-09-24T07:00:00-04:00\n")
+	writeMetadata(t, root, "d-fractionally-newest", "schema: expledger/v1\nid: d-fractionally-newest\ntitle: Fractionally newest\ncreated_at: 2026-09-24T11:00:00.000000001Z\n")
 
 	records, err := List(root)
 	if err != nil {
@@ -85,9 +84,9 @@ func TestListEmpty(t *testing.T) {
 
 func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 	root := t.TempDir()
-	writeListREADME(t, root, "20260920-baseline", "---\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n---\n")
-	writeListREADME(t, root, filepath.Join("20260920-baseline", "artifacts"), "not experiment metadata")
-	if err := os.WriteFile(filepath.Join(root, "experiments", "README.md"), []byte("loose notes"), 0644); err != nil {
+	writeMetadata(t, root, "20260920-baseline", "schema: expledger/v1\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n")
+	writeMetadata(t, root, filepath.Join("20260920-baseline", "artifacts"), "not experiment metadata")
+	if err := os.WriteFile(filepath.Join(root, "experiments", "expledger.yaml"), []byte("loose notes"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(t.TempDir(), filepath.Join(root, "experiments", "linked")); err != nil {
@@ -99,21 +98,15 @@ func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 	}
 }
 
-func TestListInvalidREADME(t *testing.T) {
-	for _, content := range []string{"", "not front matter", "---\nid: missing-title\ncreated_at: 2026-09-24T12:00:00Z\n---\n"} {
+func TestListInvalidMetadata(t *testing.T) {
+	for _, content := range []string{"", "not YAML metadata", "schema: expledger/v1\nid: missing-title\ncreated_at: 2026-09-24T12:00:00Z\n"} {
 		t.Run(content, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
-			if content == "" {
-				if err := os.Mkdir(filepath.Join(root, "experiments", "z-invalid"), 0755); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				writeListREADME(t, root, "z-invalid", content)
-			}
+			writeMetadata(t, root, "a-valid", "schema: expledger/v1\nid: a-valid\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n")
+			writeMetadata(t, root, "z-invalid", content)
 			records, err := List(root)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "z-invalid", "README.md")) {
-				t.Fatalf("error = %v, want the invalid README path", err)
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "z-invalid", "expledger.yaml")) {
+				t.Fatalf("error = %v, want the invalid metadata path", err)
 			}
 			if len(records) != 0 {
 				t.Fatalf("returned partial results: %+v", records)
@@ -143,21 +136,21 @@ func TestListRejectsInvalidExperimentsDirectory(t *testing.T) {
 	}
 }
 
-func TestListRejectsREADMEOutsideProject(t *testing.T) {
+func TestListRejectsMetadataOutsideProject(t *testing.T) {
 	root, outside := t.TempDir(), t.TempDir()
 	path := filepath.Join(root, "experiments", "linked")
 	if err := os.MkdirAll(path, 0755); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(outside, "README.md")
-	if err := os.WriteFile(target, []byte("---\nid: outside\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n---\n"), 0644); err != nil {
+	target := filepath.Join(outside, "expledger.yaml")
+	if err := os.WriteFile(target, []byte("schema: expledger/v1\nid: outside\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(path, "README.md")); err != nil {
+	if err := os.Symlink(target, filepath.Join(path, "expledger.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := List(root); err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "linked", "README.md")) {
-		t.Fatalf("error = %v, want an error at the escaped README path", err)
+	if _, err := List(root); err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "linked", "expledger.yaml")) {
+		t.Fatalf("error = %v, want an error at the escaped metadata path", err)
 	}
 }
 
@@ -165,16 +158,16 @@ func TestListRejectsMismatchedIDs(t *testing.T) {
 	for _, id := range []string{"different", "Z-folder", "z-folder ", "a-valid"} {
 		t.Run(id, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
+			writeMetadata(t, root, "a-valid", "schema: expledger/v1\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n")
 			// Reusing a-valid also checks duplicate metadata in different folders.
-			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n# Keep these notes\n", id)
-			writeListREADME(t, root, "z-folder", content)
-			readme := filepath.Join("experiments", "z-folder", "README.md")
+			content := fmt.Sprintf("schema: expledger/v1\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n", id)
+			writeMetadata(t, root, "z-folder", content)
+			metadata := filepath.Join("experiments", "z-folder", "expledger.yaml")
 			records, err := List(root)
 			if err == nil {
 				t.Fatal("accepted mismatched ID")
 			}
-			for _, want := range []string{readme, fmt.Sprintf("%q", id), `"z-folder"`} {
+			for _, want := range []string{metadata, fmt.Sprintf("%q", id), `"z-folder"`} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("error = %v, want %q", err, want)
 				}
@@ -182,21 +175,21 @@ func TestListRejectsMismatchedIDs(t *testing.T) {
 			if len(records) != 0 {
 				t.Fatalf("returned partial results: %+v", records)
 			}
-			data, err := os.ReadFile(filepath.Join(root, readme))
+			data, err := os.ReadFile(filepath.Join(root, metadata))
 			if err != nil || string(data) != content {
-				t.Fatalf("List changed README: data=%q, err=%v", data, err)
+				t.Fatalf("List changed metadata: data=%q, err=%v", data, err)
 			}
 		})
 	}
 }
 
-func writeListREADME(t *testing.T, root, name, content string) {
+func writeMetadata(t *testing.T, root, name, content string) {
 	t.Helper()
 	dir := filepath.Join(root, "experiments", name)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "expledger.yaml"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -204,8 +197,8 @@ func writeListREADME(t *testing.T, root, name, content string) {
 func TestListRecordsCanBeRead(t *testing.T) {
 	root := t.TempDir()
 	for _, id := range []string{"20260924-baseline", "Existing notes", "café-α", " leading and trailing "} {
-		content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n# Keep these notes\n", id)
-		writeListREADME(t, root, id, content)
+		content := fmt.Sprintf("schema: expledger/v1\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n", id)
+		writeMetadata(t, root, id, content)
 	}
 	records, err := List(root)
 	if err != nil {
@@ -226,9 +219,9 @@ func TestListRejectsInvalidDirectoryIDs(t *testing.T) {
 	for _, id := range []string{`z\invalid`, " \t"} {
 		t.Run(id, func(t *testing.T) {
 			root := t.TempDir()
-			writeListREADME(t, root, "a-valid", "---\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n---\n")
-			content := fmt.Sprintf("---\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n---\n", id)
-			writeListREADME(t, root, id, content)
+			writeMetadata(t, root, "a-valid", "schema: expledger/v1\nid: a-valid\ntitle: Valid\ncreated_at: 2026-09-24T12:00:00Z\n")
+			content := fmt.Sprintf("schema: expledger/v1\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n", id)
+			writeMetadata(t, root, id, content)
 			records, err := List(root)
 			_, readErr := Read(root, id)
 			if err == nil || readErr == nil || err.Error() != readErr.Error() || !strings.Contains(err.Error(), "invalid experiment ID") {

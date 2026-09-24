@@ -309,8 +309,10 @@ func assertNew(t *testing.T, cwd, root string) {
 	if got := strings.TrimSpace(stdout.String()); got != want {
 		t.Fatalf("created path = %q, want %q", got, want)
 	}
-	if _, err := os.Stat(filepath.Join(want, "README.md")); err != nil {
-		t.Fatalf("experiment README: %v", err)
+	for _, filename := range []string{"expledger.yaml", "README.md"} {
+		if _, err := os.Stat(filepath.Join(want, filename)); err != nil {
+			t.Fatalf("experiment %s: %v", filename, err)
+		}
 	}
 }
 
@@ -334,4 +336,17 @@ func writeREADME(t *testing.T, root, id string, data []byte) string {
 		t.Fatal(err)
 	}
 	return readme
+}
+
+func writeMetadata(t *testing.T, root, id string, data []byte) string {
+	t.Helper()
+	dir := filepath.Join(root, "experiments", id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(dir, "expledger.yaml")
+	if err := os.WriteFile(metadata, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return metadata
 }
