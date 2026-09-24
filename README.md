@@ -29,7 +29,7 @@ ExpLedger is in active development. Expect breaking changes.
 | `expledger list` | List experiment IDs and titles, newest first. |
 | `expledger validate <id>` | Validate an experiment's `expledger.yaml` and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
-| `expledger serve [--port <port>]` | Browse experiments locally with links to their GitHub folders. |
+| `expledger serve [--port <port>]` | Browse experiments locally with remote links to their folders. |
 | `expledger help [command]` | Show help and available flags. |
 
 `build` and `serve` work in local-only repositories and detached worktrees.

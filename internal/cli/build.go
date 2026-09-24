@@ -29,7 +29,7 @@ func buildExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repositoryURL, branch, err := githubLocation(cmd.Context(), app.repoRoot)
+			repositoryURL, branch, err := remoteLocation(cmd.Context(), app.repoRoot)
 			if err != nil {
 				return err
 			}

@@ -61,7 +61,7 @@ func TestRenderWithoutRemoteLinks(t *testing.T) {
 			t.Fatal(err)
 		}
 		page := string(body)
-		if !strings.Contains(page, "Local experiment") || strings.Contains(page, `class="github"`) || strings.Contains(page, "href=") {
+		if !strings.Contains(page, "Local experiment") || strings.Contains(page, `class="remote-link"`) || strings.Contains(page, "href=") {
 			t.Fatalf("local catalog contains missing content or remote links: %s", page)
 		}
 		if options.Branch == "" && strings.Contains(page, `class="branch"`) {

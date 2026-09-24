@@ -160,7 +160,7 @@ func TestBuildWithoutRemoteLinks(t *testing.T) {
 				t.Fatal(err)
 			}
 			body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
-			if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="github"`)) {
+			if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="remote-link"`)) {
 				t.Fatalf("local snapshot missing or includes remote links: %v\n%s", err, body)
 			}
 		})

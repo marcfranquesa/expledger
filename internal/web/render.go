@@ -18,7 +18,7 @@ var indexHTML string
 var indexTemplate = template.Must(template.New("index").Parse(indexHTML))
 
 type experimentView struct {
-	ID, Title, CreatedAt, DateTime, GitHubURL string
+	ID, Title, CreatedAt, DateTime, RemoteURL string
 }
 
 type page struct {
@@ -26,7 +26,7 @@ type page struct {
 	Experiments     []experimentView
 }
 
-// PageOptions supplies display metadata and an optional normalized GitHub URL.
+// PageOptions supplies display metadata and an optional normalized repository URL.
 type PageOptions struct {
 	Project, RepositoryURL, Branch string
 }
@@ -44,7 +44,7 @@ func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
 			ID: record.ID, Title: record.Title,
 			CreatedAt: created.Format("Jan 02, 2006 · 15:04:05 UTC"),
 			DateTime:  created.Format(time.RFC3339Nano),
-			GitHubURL: remoteURL,
+			RemoteURL: remoteURL,
 		})
 	}
 	var body bytes.Buffer
