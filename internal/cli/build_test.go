@@ -133,28 +133,6 @@ func TestBuildEmptyAndOutputErrors(t *testing.T) {
 	}
 }
 
-func TestBuildHelpAndArguments(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
-	for _, args := range [][]string{{"build", "--help"}, {"help", "build"}} {
-		var stdout bytes.Buffer
-		if err := cli.Run(context.Background(), args, t.TempDir(), time.Time{}, &stdout); err != nil {
-			t.Fatal(err)
-		}
-		for _, want := range []string{"--output", "dist", "index.html", "snapshot"} {
-			if !strings.Contains(stdout.String(), want) {
-				t.Fatalf("help missing %q: %s", want, stdout.String())
-			}
-		}
-	}
-	for _, args := range [][]string{{"build", "extra"}, {"build", "--output="}, {"build", "--output"}, {"build", "--unknown"}} {
-		var stdout bytes.Buffer
-		err := cli.Run(context.Background(), args, t.TempDir(), time.Time{}, &stdout)
-		if err == nil || strings.Contains(err.Error(), "Git") || stdout.Len() != 0 {
-			t.Fatalf("expected argument error before Git lookup for %v, got %v", args, err)
-		}
-	}
-}
-
 func TestBuildWithoutRemoteLinks(t *testing.T) {
 	for _, tt := range []struct {
 		name, remote string

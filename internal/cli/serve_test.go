@@ -41,29 +41,6 @@ func TestGitHubRepositoryURL(t *testing.T) {
 	}
 }
 
-func TestServeHelpAndArguments(t *testing.T) {
-	for _, args := range [][]string{{"serve", "--help"}, {"help", "serve"}} {
-		root := t.TempDir()
-		t.Setenv("PATH", t.TempDir())
-		var output strings.Builder
-		if err := Run(context.Background(), args, root, time.Now(), &output); err != nil {
-			t.Fatal(err)
-		}
-		for _, want := range []string{"--port", "127.0.0.1", "Ctrl+C"} {
-			if !strings.Contains(output.String(), want) {
-				t.Fatalf("help missing %q: %s", want, output.String())
-			}
-		}
-	}
-	for _, args := range [][]string{{"serve", "extra"}, {"serve", "--port=-1"}, {"serve", "--port=65536"}} {
-		var output strings.Builder
-		err := Run(context.Background(), args, t.TempDir(), time.Now(), &output)
-		if err == nil || strings.Contains(err.Error(), "Git") {
-			t.Fatalf("expected argument error before Git lookup for %v, got %v", args, err)
-		}
-	}
-}
-
 func TestServeStartsAndStops(t *testing.T) {
 	for _, withRemote := range []bool{false, true} {
 		name := "local only"

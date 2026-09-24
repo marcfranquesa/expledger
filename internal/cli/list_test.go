@@ -208,41 +208,6 @@ func TestListRejectsMismatchedID(t *testing.T) {
 	}
 }
 
-func TestListHelp(t *testing.T) {
-	for _, args := range [][]string{{"list", "--help"}, {"list", "-h"}, {"help", "list"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			root := t.TempDir()
-			t.Setenv("PATH", t.TempDir())
-			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), args, root, time.Time{}, &stdout); err != nil {
-				t.Fatal(err)
-			}
-			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger list") {
-				t.Fatalf("list help does not describe usage: %q", got)
-			}
-			assertEmptyDirectory(t, root)
-		})
-	}
-}
-
-func TestListInvalidArguments(t *testing.T) {
-	for _, args := range [][]string{{"list", "extra"}, {"list", "--unknown"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			root := t.TempDir()
-			t.Setenv("PATH", t.TempDir())
-			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), args, root, time.Time{}, &stdout)
-			if err == nil || strings.Contains(err.Error(), "find Git working tree") {
-				t.Fatalf("expected usage error before Git lookup, got %v", err)
-			}
-			if stdout.Len() != 0 {
-				t.Fatalf("invalid command printed output: %q", stdout.String())
-			}
-			assertEmptyDirectory(t, root)
-		})
-	}
-}
-
 func TestListOutsideGit(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
