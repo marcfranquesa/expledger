@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -14,7 +15,8 @@ type application struct {
 	now      time.Time
 }
 
-func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
+// Run checks cancellation before running a command and stops serve when ctx ends.
+func Run(ctx context.Context, args []string, cwd string, now time.Time, stdout io.Writer) error {
 	app := &application{cwd: cwd, now: now}
 	root := &cobra.Command{
 		Use:           "expledger",
@@ -29,6 +31,9 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 			if cmd.Name() == "help" {
 				return nil
 			}
+			if err := cmd.Context().Err(); err != nil {
+				return err
+			}
 			var err error
 			app.repoRoot, err = gitRoot(cwd)
 			return err
@@ -37,5 +42,5 @@ func Run(args []string, cwd string, now time.Time, stdout io.Writer) error {
 	root.SetArgs(append([]string{}, args...))
 	root.SetOut(stdout)
 	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), validateExperimentCommand(app), buildExperimentsCommand(app), serveExperimentsCommand(app))
-	return root.Execute()
+	return root.ExecuteContext(ctx)
 }

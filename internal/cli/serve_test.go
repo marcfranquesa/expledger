@@ -46,7 +46,7 @@ func TestServeHelpAndArguments(t *testing.T) {
 		root := t.TempDir()
 		t.Setenv("PATH", t.TempDir())
 		var output strings.Builder
-		if err := Run(args, root, time.Now(), &output); err != nil {
+		if err := Run(context.Background(), args, root, time.Now(), &output); err != nil {
 			t.Fatal(err)
 		}
 		for _, want := range []string{"--port", "127.0.0.1", "Ctrl+C"} {
@@ -57,7 +57,7 @@ func TestServeHelpAndArguments(t *testing.T) {
 	}
 	for _, args := range [][]string{{"serve", "extra"}, {"serve", "--port=-1"}, {"serve", "--port=65536"}} {
 		var output strings.Builder
-		err := Run(args, t.TempDir(), time.Now(), &output)
+		err := Run(context.Background(), args, t.TempDir(), time.Now(), &output)
 		if err == nil || strings.Contains(err.Error(), "Git") {
 			t.Fatalf("expected argument error before Git lookup for %v, got %v", args, err)
 		}
@@ -70,13 +70,9 @@ func TestServeStartsAndStops(t *testing.T) {
 	serveGit(t, root, "remote", "add", "origin", "git@github.com:owner/repo.git")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cmd := serveExperimentsCommand(&application{repoRoot: root})
-	cmd.SetContext(ctx)
-	cmd.SetArgs([]string{"--port=0"})
 	output := make(startupOutput, 2)
-	cmd.SetOut(output)
 	finished := make(chan error, 1)
-	go func() { finished <- cmd.Execute() }()
+	go func() { finished <- Run(ctx, []string{"serve", "--port=0"}, root, time.Time{}, output) }()
 	var address string
 	select {
 	case text := <-output:

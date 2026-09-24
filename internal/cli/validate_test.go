@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,7 @@ func TestValidateFromNestedDirectory(t *testing.T) {
 	writeREADME(t, root, "unrelated", []byte("not valid front matter\n"))
 
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"validate", validateID}, cwd, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"validate", validateID}, cwd, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/README.md\n"; got != want {
@@ -54,7 +55,7 @@ func TestValidateRejectsInvalidReadmeWithoutChangingIt(t *testing.T) {
 			git(t, root, "init", "--quiet")
 			readme := writeREADME(t, root, validateID, []byte(tt.data))
 			var stdout bytes.Buffer
-			err := cli.Run([]string{"validate", validateID}, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
@@ -90,7 +91,7 @@ func TestValidateMissingReadme(t *testing.T) {
 				}
 			}
 			var stdout bytes.Buffer
-			err := cli.Run([]string{"validate", validateID}, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, &stdout)
 			wantPath := filepath.Join("experiments", validateID)
 			if existingFolder {
 				wantPath = filepath.Join(wantPath, "README.md")

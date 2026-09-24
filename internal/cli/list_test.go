@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,7 @@ func TestListFromNestedDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"list"}, cwd, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"list"}, cwd, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
@@ -48,7 +49,7 @@ func TestListNormalizesWhitespace(t *testing.T) {
 	git(t, root, "init", "--quiet")
 	writeListRecord(t, root, "20260924-record", experiment.Record{ID: "20260924-record", Title: "Messy\t title\ncontinued", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"list"}, root, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
@@ -73,7 +74,7 @@ func TestListEmpty(t *testing.T) {
 				}
 			}
 			var stdout bytes.Buffer
-			if err := cli.Run([]string{"list"}, root, time.Time{}, &stdout); err != nil {
+			if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err != nil {
 				t.Fatal(err)
 			}
 			if got, want := stdout.String(), "No experiments found.\n"; got != want {
@@ -108,7 +109,7 @@ func TestListInvalidReadme(t *testing.T) {
 				}
 			}
 			var stdout bytes.Buffer
-			err := cli.Run([]string{"list"}, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout)
 			if err == nil || !strings.Contains(err.Error(), filepath.Join("z-invalid", "README.md")) {
 				t.Fatalf("expected invalid README path in error, got %v", err)
 			}
@@ -127,7 +128,7 @@ func TestListRejectsMismatchedID(t *testing.T) {
 	const id = "20260924-original"
 	writeListRecord(t, root, folder, experiment.Record{ID: id, Title: "Renamed experiment", CreatedAt: metadataTestTime()})
 	var stdout bytes.Buffer
-	err := cli.Run([]string{"list"}, root, time.Time{}, &stdout)
+	err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout)
 	if err == nil {
 		t.Fatal("expected error for experiment ID differing from its folder")
 	}
@@ -147,7 +148,7 @@ func TestListHelp(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
-			if err := cli.Run(args, root, time.Time{}, &stdout); err != nil {
+			if err := cli.Run(context.Background(), args, root, time.Time{}, &stdout); err != nil {
 				t.Fatal(err)
 			}
 			if got := stdout.String(); !strings.Contains(got, "Usage:") || !strings.Contains(got, "expledger list") {
@@ -164,7 +165,7 @@ func TestListInvalidArguments(t *testing.T) {
 			root := t.TempDir()
 			t.Setenv("PATH", t.TempDir())
 			var stdout bytes.Buffer
-			err := cli.Run(args, root, time.Time{}, &stdout)
+			err := cli.Run(context.Background(), args, root, time.Time{}, &stdout)
 			if err == nil || strings.Contains(err.Error(), "find Git working tree") {
 				t.Fatalf("expected usage error before Git lookup, got %v", err)
 			}
@@ -179,7 +180,7 @@ func TestListInvalidArguments(t *testing.T) {
 func TestListOutsideGit(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"list"}, root, time.Time{}, &stdout); err == nil {
+	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, &stdout); err == nil {
 		t.Fatal("expected error outside a Git worktree")
 	}
 	if stdout.Len() != 0 {

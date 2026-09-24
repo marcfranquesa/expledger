@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,7 +39,7 @@ func TestBuildSnapshot(t *testing.T) {
 			dir = filepath.Join(cwd, dir)
 		}
 		var stdout bytes.Buffer
-		if err := cli.Run(args, cwd, time.Time{}, &stdout); err != nil {
+		if err := cli.Run(context.Background(), args, cwd, time.Time{}, &stdout); err != nil {
 			t.Fatal(err)
 		}
 		path := filepath.Join(dir, "index.html")
@@ -79,7 +80,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatalf("snapshot changed without a build: %v", err)
 	}
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"build"}, cwd, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err = os.ReadFile(path)
@@ -94,7 +95,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run([]string{"build"}, cwd, time.Time{}, &stdout); err == nil || !strings.Contains(err.Error(), "README.md") {
+	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, &stdout); err == nil || !strings.Contains(err.Error(), "README.md") {
 		t.Fatalf("invalid catalog error = %v", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, snapshot) || stdout.Len() != 0 {
@@ -107,7 +108,7 @@ func TestBuildEmptyAndOutputErrors(t *testing.T) {
 	git(t, root, "init", "--quiet", "--initial-branch=main")
 	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"build"}, root, time.Time{}, &stdout); err != nil {
+	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	if body, err := os.ReadFile(filepath.Join(root, "dist", "index.html")); err != nil || !bytes.Contains(body, []byte("No experiments yet")) {
@@ -125,7 +126,7 @@ func TestBuildEmptyAndOutputErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 		stdout.Reset()
-		err := cli.Run([]string{"build", "--output", dir}, root, time.Time{}, &stdout)
+		err := cli.Run(context.Background(), []string{"build", "--output", dir}, root, time.Time{}, &stdout)
 		if err == nil || !strings.Contains(err.Error(), want) || stdout.Len() != 0 {
 			t.Fatalf("output error = %v, stdout = %q", err, stdout.String())
 		}
@@ -136,7 +137,7 @@ func TestBuildHelpAndArguments(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	for _, args := range [][]string{{"build", "--help"}, {"help", "build"}} {
 		var stdout bytes.Buffer
-		if err := cli.Run(args, t.TempDir(), time.Time{}, &stdout); err != nil {
+		if err := cli.Run(context.Background(), args, t.TempDir(), time.Time{}, &stdout); err != nil {
 			t.Fatal(err)
 		}
 		for _, want := range []string{"--output", "dist", "index.html", "snapshot"} {
@@ -147,7 +148,7 @@ func TestBuildHelpAndArguments(t *testing.T) {
 	}
 	for _, args := range [][]string{{"build", "extra"}, {"build", "--output="}, {"build", "--output"}, {"build", "--unknown"}} {
 		var stdout bytes.Buffer
-		err := cli.Run(args, t.TempDir(), time.Time{}, &stdout)
+		err := cli.Run(context.Background(), args, t.TempDir(), time.Time{}, &stdout)
 		if err == nil || strings.Contains(err.Error(), "Git") || stdout.Len() != 0 {
 			t.Fatalf("expected argument error before Git lookup for %v, got %v", args, err)
 		}
