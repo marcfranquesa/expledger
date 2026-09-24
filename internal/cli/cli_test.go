@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,8 +40,83 @@ func TestNewFromGitWorktree(t *testing.T) {
 func TestNewOutsideGit(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
-	if err := cli.Run([]string{"new", "my-idea"}, root, time.Now(), &stdout); err == nil {
+	err := cli.Run([]string{"new", "my-idea"}, root, time.Now(), &stdout)
+	if err == nil {
 		t.Fatal("expected error outside a Git worktree")
+	}
+	for _, want := range []string{root, "Git repository", "existing", "git init"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("outside-repository error %q does not contain %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "exit status 128") {
+		t.Errorf("outside-repository error exposes Git's exit status: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("failed command wrote to stdout: %q", stdout.String())
+	}
+	assertEmptyDirectory(t, root)
+}
+
+func TestNewWithoutGit(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("PATH", t.TempDir())
+	var stdout bytes.Buffer
+	err := cli.Run([]string{"new", "my-idea"}, root, time.Now(), &stdout)
+	if !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("missing-Git error = %v, want wrapped exec.ErrNotFound", err)
+	}
+	if strings.Contains(err.Error(), "git init") {
+		t.Errorf("missing-Git error incorrectly suggests initializing a repository: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("failed command wrote to stdout: %q", stdout.String())
+	}
+	assertEmptyDirectory(t, root)
+}
+
+func TestNewInBareRepository(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--bare", "--quiet")
+	var stdout bytes.Buffer
+	err := cli.Run([]string{"new", "my-idea"}, root, time.Now(), &stdout)
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("bare-repository error = %v, want wrapped exec.ExitError", err)
+	}
+	if !strings.Contains(err.Error(), "work tree") {
+		t.Errorf("bare-repository error omits Git's working-tree diagnostic: %v", err)
+	}
+	if strings.Contains(err.Error(), "git init") || strings.Contains(err.Error(), "not a git repository") {
+		t.Errorf("bare-repository error incorrectly describes a missing repository: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("failed command wrote to stdout: %q", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "experiments")); !os.IsNotExist(err) {
+		t.Fatalf("failed command should not create experiments directory; stat error: %v", err)
+	}
+}
+
+func TestNewWithInvalidGitDirectory(t *testing.T) {
+	root := t.TempDir()
+	git(t, root, "init", "--quiet")
+	missing := filepath.Join(root, "missing.git")
+	t.Setenv("GIT_DIR", missing)
+	var stdout bytes.Buffer
+	err := cli.Run([]string{"new", "my-idea"}, root, time.Now(), &stdout)
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("invalid-GIT_DIR error = %v, want wrapped exec.ExitError", err)
+	}
+	if !strings.Contains(err.Error(), missing) {
+		t.Errorf("invalid-GIT_DIR error omits the invalid path: %v", err)
+	}
+	if strings.Contains(err.Error(), "no Git repository found") || strings.Contains(err.Error(), "git init") {
+		t.Errorf("invalid-GIT_DIR error incorrectly suggests creating a repository: %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("failed command wrote to stdout: %q", stdout.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "experiments")); !os.IsNotExist(err) {
 		t.Fatalf("failed command should not create experiments directory; stat error: %v", err)
