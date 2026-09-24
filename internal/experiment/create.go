@@ -33,8 +33,9 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	}
 	record := Record{
 		ID: id, Title: title,
-		BasedOn: opts.BasedOn,
-		Body:    []byte(fmt.Sprintf("\n# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)),
+		CreatedAt: now.UTC(),
+		BasedOn:   opts.BasedOn,
+		Body:      []byte(fmt.Sprintf("\n# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)),
 	}
 	data, err := record.Marshal()
 	if err != nil {
