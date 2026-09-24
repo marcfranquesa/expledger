@@ -74,8 +74,9 @@ with no partial list; a dangling metadata symlink is an error. `build` and `serv
 use the same catalog rules.
 
 The `experiments` directory and directly requested experiment directories must
-be real directories. Relative metadata symlinks that stay within the project root
-are readable; absolute links and paths that escape the root are rejected.
+be real directories. Metadata must resolve to a regular file. Relative metadata
+symlinks that stay within the project root are readable; absolute links and paths
+that escape the root are rejected.
 
 Re-encoding retains custom metadata values and YAML types, including large
 numbers, binary values, and nulls, but does not promise original YAML layout or
