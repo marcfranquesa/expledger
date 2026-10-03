@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/marcfranquesa/expledger/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -52,6 +53,7 @@ func NewCommand(cwd string, now time.Time) *cobra.Command {
 	app := &application{cwd: cwd, now: now}
 	root := &cobra.Command{
 		Use:           "expledger",
+		Version:       version.String(),
 		Short:         rootDescription,
 		Long:          rootDetails,
 		Example:       "  expledger init\n  expledger new baseline\n  expledger list",

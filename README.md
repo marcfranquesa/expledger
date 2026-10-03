@@ -8,7 +8,9 @@ Git dependency.
 **[Documentation](https://marcfranquesa.github.io/expledger/)** — installation,
 getting started, configuration, the experiment format, and generated CLI reference.
 
-ExpLedger is in active development. Expect breaking changes.
+ExpLedger is in active development. Expect breaking changes. See
+[installation](docs/install.md) and the [version and release policy](docs/releases.md).
+The planned first release is v0.1.0.
 
 ## Development
 
