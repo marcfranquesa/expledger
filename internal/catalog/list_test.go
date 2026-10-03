@@ -16,18 +16,24 @@ func TestList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 3 {
-		t.Fatalf("records = %+v, want three experiments", records)
+	if len(records) != 5 {
+		t.Fatalf("records = %+v, want five experiments", records)
 	}
-	if records[0].ID != "20260924-long-title" || records[0].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" {
-		t.Fatalf("newest record = %+v, want long title", records[0])
+	if records[0].ID != "20260924-combined" || !reflect.DeepEqual(records[0].BasedOn, []string{"20260924-variant", "20260924-wide"}) {
+		t.Fatalf("combined record = %+v, want both parents", records[0])
 	}
-	if records[1].ID != "20260924-variant" || records[1].Title != "Lower learning rate" ||
-		!reflect.DeepEqual(records[1].BasedOn, []string{"20260924-baseline"}) {
-		t.Fatalf("middle record = %+v, want variant based on baseline", records[1])
+	if records[1].ID != "20260924-wide" || !reflect.DeepEqual(records[1].BasedOn, []string{"20260924-baseline"}) {
+		t.Fatalf("wide record = %+v, want second branch", records[1])
 	}
-	if records[2].ID != "20260924-baseline" || records[2].Title != "Baseline model" || len(records[2].BasedOn) != 0 {
-		t.Fatalf("oldest record = %+v, want independent baseline", records[2])
+	if records[2].ID != "20260924-long-title" || records[2].Title != "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title" {
+		t.Fatalf("third record = %+v, want long title", records[2])
+	}
+	if records[3].ID != "20260924-variant" || records[3].Title != "Lower learning rate" ||
+		!reflect.DeepEqual(records[3].BasedOn, []string{"20260924-baseline"}) {
+		t.Fatalf("fourth record = %+v, want variant based on baseline", records[3])
+	}
+	if records[4].ID != "20260924-baseline" || records[4].Title != "Baseline model" || len(records[4].BasedOn) != 0 {
+		t.Fatalf("oldest record = %+v, want independent baseline", records[4])
 	}
 
 }

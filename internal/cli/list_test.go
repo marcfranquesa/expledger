@@ -31,6 +31,8 @@ func TestListFromNestedDirectory(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(stdout.String(), "\n"), "\n")
 	want := []string{
 		"ID TITLE",
+		"20260924-combined Combine width and learning rate",
+		"20260924-wide Wider hidden layer",
 		"20260924-long-title Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title",
 		"20260924-variant Lower learning rate",
 		"20260924-baseline Baseline model",

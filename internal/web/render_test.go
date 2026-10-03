@@ -72,11 +72,36 @@ func TestRenderRemoteDirectoryAndEscapedID(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := `href="https://example.com/space%20name/experiments/trial%20%3F%23%25%20%E9%9B%AA"`
-		if !strings.Contains(string(body), want) {
-			t.Fatalf("missing escaped link %s", want)
+		if strings.Count(string(body), want) != 2 {
+			t.Fatalf("expected escaped link in both list and graph: %s", want)
 		}
 		if strings.Contains(string(body), `class="branch"`) {
 			t.Fatal("inferred branch badge")
 		}
+	}
+}
+
+func TestGraphEscapingAndReferences(t *testing.T) {
+	records := []experiment.Record{{ID: `child\"><svg onload=alert(1)>`, Title: `研究 & <img src=x onerror=alert(1)>`, BasedOn: []string{`parent\"><script>alert(1)</script>`, `parent\"><script>alert(1)</script>`}}}
+	body, err := web.Render(records, web.PageOptions{Project: "Graph", RemoteURL: "javascript:alert(1)"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	for _, unsafe := range []string{`<svg onload`, `<img src=x`, `<script>alert(1)`, `href="javascript:`} {
+		if strings.Contains(page, unsafe) {
+			t.Errorf("unsafe metadata: %s", unsafe)
+		}
+	}
+	for _, want := range []string{`Missing experiment`, `研究 &amp; &lt;img`, `parent\&#34;&gt;&lt;script&gt;`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("missing %s", want)
+		}
+	}
+	if strings.Count(page, `<path data-from=`) != 1 {
+		t.Fatal("duplicate parent edges")
+	}
+	if strings.Count(page, `data-node=`) != 2 {
+		t.Fatal("missing known or reference node")
 	}
 }

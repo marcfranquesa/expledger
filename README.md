@@ -67,6 +67,29 @@ ExpLedger no longer records commits, dirty state, or `last_run`. Historical
 `last_run` values remain accepted as custom metadata and are never updated;
 they are not current run provenance.
 
+## Experiment graph
+
+Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
+The list remains the default. Parent-to-child arrows run through dependency
+columns, with titles and IDs fully wrapped. Focus or hover a card to highlight
+its immediate connections; remote links behave as they do in the list.
+
+The layout is deterministic by ID, independent of timestamps. Multiple parents
+are supported and repeated references produce one edge. Missing parents appear
+as dashed reference cards. Cycles (including self-references) remain visible in
+one column with dashed arrows; the display does not reject or rewrite metadata.
+Independent experiments remain visible as roots. Every card includes parent IDs
+as a text alternative to the arrows.
+
+The page is self-contained and works offline. Graph switching and edge placement
+use embedded JavaScript; without JavaScript the list remains usable. Large graphs
+scroll horizontally and vertically at readable text size. Dense graphs can still
+have crossing edges; highlighting helps trace direct connections. There is no
+zoom, filtering, or report panel in this first version.
+
+Inspired by [Lab Exp's experiment graph](https://github.com/rsoatto/lab-exp),
+with an independent implementation using ExpLedger's metadata and renderer.
+
 ## Installation
 
 Building requires Go 1.26+; the clone command below uses Git. The installed CLI

@@ -23,6 +23,27 @@
     .remote-link { flex-shrink: 0; display: inline-block; padding: 9px 12px; border: 1px solid #d4d4ce; border-radius: 6px; color: #33332e; background: #fff; font-size: 13px; text-decoration: none; }
     .remote-link:hover { border-color: #8c8c83; background: #f3f3ef; }
     .remote-link:focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
+    [hidden] { display: none !important; }
+    .view-controls { display: flex; gap: 4px; margin-top: 32px; }
+    .view-controls button { font: inherit; font-size: 13px; padding: 8px 16px; border: 1px solid #d4d4ce; border-radius: 6px; background: white; color: #33332e; cursor: pointer; }
+    .view-controls button[aria-pressed="true"] { background: #33332e; color: white; border-color: #33332e; }
+    :focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
+    .graph-help { color: #60605a; font-size: 13px; line-height: 1.6; }
+    .graph-scroll { overflow: auto; max-height: 75vh; border: 1px solid #dcdcd6; border-radius: 8px; background: #f5f5f2; }
+    .graph-canvas { position: relative; width: max-content; min-width: 100%; }
+    .graph-columns { display: flex; gap: 88px; padding: 36px 64px 36px 24px; position: relative; }
+    .graph-column { width: 248px; flex: none; display: flex; flex-direction: column; gap: 32px; }
+    .graph-node { padding: 16px; border: 1px solid #c9c9c1; border-radius: 7px; background: white; min-width: 0; }
+    .graph-node h2 { font-size: 15px; }
+    .graph-node .id { font-size: 12px; }
+    .graph-node.missing { border-style: dashed; background: #fafaf9; }
+    .graph-node .remote-link { margin-top: 12px; padding: 6px 9px; font-size: 12px; }
+    .parents { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: #60605a; overflow-wrap: anywhere; }
+    .graph-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .graph-edges path { fill: none; stroke: #73736a; stroke-width: 1.5; }
+    .graph-node.related { border-color: #33332e; }
+    .graph-edges path.related { stroke-width: 2; }
+    .graph-edges .cycle { stroke-dasharray: 5 3; }
     .empty { padding: 44px 0; }
     .empty p { color: #60605a; line-height: 1.7; }
     @media (max-width: 600px) {
@@ -39,6 +60,11 @@
       <h1>Experiments</h1>
       <div class="context"><span>{{.Project}}</span></div>
     </header>
+    <div class="view-controls" hidden role="group" aria-label="Experiment view">
+      <button type="button" aria-pressed="true" aria-controls="list-view" data-view="list-view">List</button>
+      <button type="button" aria-pressed="false" aria-controls="graph-view" data-view="graph-view">Graph</button>
+    </div>
+    <div id="list-view">
     <p class="section-heading">Newest first</p>
     {{if .Experiments}}
     <ol class="experiments">
@@ -59,6 +85,95 @@
       <p>Create your first record with <code>expledger new my-idea</code>.</p>
     </section>
     {{end}}
+    </div>
+    <section id="graph-view" hidden aria-label="Experiment lineage">
+      <p class="graph-help">Parent → child · dependency columns, not time. Dashed cards are missing references; dashed arrows stay within a cycle. Focus or hover a card to highlight its immediate connections.</p>
+      {{if .Experiments}}
+      <p class="graph-help graph-overflow" hidden>← Scroll horizontally to follow the lineage →</p>
+      <div class="graph-scroll" tabindex="0" role="region" aria-label="Scrollable experiment lineage">
+        <div class="graph-canvas">
+          <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker></defs>
+          {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
+          <div class="graph-columns">
+          {{range $rank, $column := .Graph.Columns}}<div class="graph-column">
+            {{range $column}}<article class="graph-node{{if .Missing}} missing{{end}}" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}">
+              <h2>{{.Title}}</h2><code class="id">{{.ID}}</code>
+              {{if .Missing}}<p class="parents">Referenced in based_on; absent from this catalog.</p>{{else}}
+              <p class="parents">{{if .Parents}}Based on: {{range $i, $parent := .Parents}}{{if $i}}, {{end}}<code>{{$parent}}</code>{{end}}{{else}}No parents recorded{{end}}</p>
+              {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}{{end}}
+            </article>{{end}}
+          </div>{{end}}
+          </div>
+        </div>
+      </div>
+      {{else}}<section class="empty"><h2>No experiments yet</h2><p>Create your first record with <code>expledger new my-idea</code>.</p></section>{{end}}
+    </section>
   </main>
+  <script type="text/javascript">
+    const controls = document.querySelector('.view-controls');
+    const graph = document.getElementById('graph-view');
+    function drawGraph() {
+      if (graph.hidden || !graph.querySelector('.graph-canvas')) return;
+      const canvas = graph.querySelector('.graph-canvas');
+      const columns = graph.querySelector('.graph-columns');
+      const paths = [...graph.querySelectorAll('path[data-from]')];
+      const nodes = [...graph.querySelectorAll('[data-node]')];
+      const byID = new Map(nodes.map(node => [node.dataset.node, node]));
+      const longEdges = paths.filter(path => +byID.get(path.dataset.to).dataset.rank > +byID.get(path.dataset.from).dataset.rank + 1);
+      columns.style.paddingTop = `${36 + longEdges.length * 14}px`;
+      graph.querySelector('.graph-overflow').hidden = canvas.offsetWidth <= graph.querySelector('.graph-scroll').clientWidth;
+      const origin = canvas.getBoundingClientRect();
+      const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
+      let lane = 0;
+      paths.forEach(path => {
+        const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
+        const a = box(from), b = box(to);
+        const x = a.x+a.w, y = a.y+a.h/2, ty = b.y+b.h/2;
+        const sameColumn = from.dataset.rank === to.dataset.rank;
+        path.classList.toggle('cycle', sameColumn);
+        let d;
+        if (from === to) {
+          d = `M ${x} ${y-10} C ${x+42} ${y-42}, ${x+42} ${y+42}, ${x} ${y+10}`;
+        } else if (sameColumn) {
+          const gutter = x + (a.y < b.y ? 24 : 44);
+          d = `M ${x} ${y} H ${gutter} V ${ty} H ${b.x+b.w}`;
+        } else if (+to.dataset.rank > +from.dataset.rank + 1) {
+          const top = 18 + lane++ * 14;
+          d = `M ${x} ${y} H ${x+58} V ${top} H ${b.x-20} V ${ty} H ${b.x}`;
+        } else {
+          d = `M ${x} ${y} C ${x+44} ${y}, ${b.x-44} ${ty}, ${b.x} ${ty}`;
+        }
+        path.setAttribute('d', d);
+      });
+    }
+    function highlight(node) {
+      const related = new Set(node ? [node.dataset.node] : []);
+      graph.querySelectorAll('path[data-from]').forEach(path => {
+        const incident = node && (path.dataset.from === node.dataset.node || path.dataset.to === node.dataset.node);
+        path.classList.toggle('related', !!incident);
+        if (incident) { related.add(path.dataset.from); related.add(path.dataset.to); }
+      });
+      graph.querySelectorAll('[data-node]').forEach(card => card.classList.toggle('related', related.has(card.dataset.node)));
+    }
+    graph.addEventListener('focusin', event => highlight(event.target.closest('[data-node]')));
+    graph.addEventListener('focusout', event => highlight(event.relatedTarget && event.relatedTarget.closest('[data-node]')));
+    graph.querySelectorAll('[data-node]').forEach(node => {
+      node.addEventListener('mouseenter', () => highlight(node));
+      node.addEventListener('mouseleave', () => highlight(document.activeElement.closest('[data-node]')));
+    });
+    controls.hidden = false;
+    controls.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (!button) return;
+      controls.querySelectorAll('button').forEach(control => {
+        const selected = control === button;
+        control.setAttribute('aria-pressed', selected);
+        document.getElementById(control.dataset.view).hidden = !selected;
+      });
+      drawGraph();
+    });
+    new ResizeObserver(drawGraph).observe(graph);
+    document.fonts.ready.then(drawGraph);
+  </script>
 </body>
 </html>

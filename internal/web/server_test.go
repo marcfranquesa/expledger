@@ -33,7 +33,7 @@ func TestExperiments(t *testing.T) {
 			t.Errorf("response missing %q", want)
 		}
 	}
-	for _, unwanted := range []string{"fixture body", "Extra fixture metadata", "based_on"} {
+	for _, unwanted := range []string{"fixture body", "Extra fixture metadata", "based_on:"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("response contains %q", unwanted)
 		}
