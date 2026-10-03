@@ -1,8 +1,14 @@
-# Experiment record format
+---
+title: Experiment format
+weight: 40
+---
+
+# Experiment format
 
 Each experiment has `experiments/<id>/experiment.yaml` under the initialized project
-root. This file is the sole source of ExpLedger metadata. `README.md` holds
-independent notes; other files can hold scripts, artifacts, or another tool's
+root (see [Configuration](configuration.md)). This file is the sole source of
+ExpLedger metadata. `README.md` holds independent notes; other files can hold
+scripts, artifacts, or another tool's
 metadata. `new` creates a README and an executable `run.sh` stub; neither file is
 required for catalog reads.
 
@@ -35,60 +41,6 @@ timezone offset; offsets must be whole minutes and within RFC3339's range.
 The zero timestamp `0001-01-01T00:00:00Z` is rejected. YAML aliases and merge keys
 are unsupported, including within custom metadata.
 
-## Project configuration
-
-The project root contains `expledger.yaml`, exactly one YAML mapping with optional settings:
-
-```yaml
-remote_url: https://github.com/owner/repo/tree/main/experiments
-sources:
-  - .
-  - ../experiment-worktree
-  - /Users/me/projects/another-worktree
-```
-
-Use `{}` for a local-only project. `remote_url` must be a string; an empty string
-also disables links. A configured value is the full HTTP(S) browser URL of the
-remote experiments directory, with an ASCII hostname or IP address and optional
-port. Credentials, queries, and fragments are rejected. A trailing slash is
-optional. Existing escaped path segments are retained, and each experiment ID
-is appended as an escaped path segment. No provider or branch is inferred.
-Unknown settings, duplicate keys, non-mappings, and multiple documents are errors.
-
-`sources` applies only to `serve`. Omit it to browse the current project only.
-An explicit list replaces that default; include `.` to retain the current project.
-The list must contain at least one nonblank string. Paths name project-root
-directories containing `expledger.yaml`; source lookup does not walk up to a parent.
-Relative paths resolve from the current project's config directory after resolving
-symlinks, even when invoked from a nested directory. Absolute paths are accepted. Neither `~` nor
-environment variables are expanded by ExpLedger (quote CLI arguments to prevent
-shell expansion).
-
-Sources are read in order. The first copy of an experiment ID wins completely,
-including its metadata, `based_on` relationships, and source's `remote_url`.
-The catalog shows one entry and graph node per ID, sorted newest first; ties retain
-source order and then directory-name order. Removing a winner reveals the next
-copy on the next successful refresh. Source configs supply remote URLs, but their
-own source lists are never followed. Every selected source must be readable and
-valid, including records shadowed by an earlier source. An error fails the whole
-snapshot; there are no partial results. Existing per-project filesystem boundaries
-apply independently to each root. Aggregation does not copy or synchronize files.
-
-Commands walk the current directory and its parents, selecting the nearest
-`expledger.yaml`. An invalid or unreadable nearest config is an error; discovery
-does not fall through to a parent. No marker means an error asking you to run
-`expledger init`. Help works without a project. `init` always targets the current
-directory, allowing nested project boundaries. It never overwrites an existing
-config or experiment; a valid existing config is accepted unchanged unless an
-explicit `--remote-url` conflicts, in which case edit the file yourself.
-
-To migrate, rename each old `experiments/<id>/expledger.yaml` to
-`experiment.yaml` without changing its contents, then initialize the root.
-An old experiment marker (`schema: expledger/v1`) encountered during upward
-discovery produces a filename-migration error. There is no dual-name support.
-Historical `last_run` values are ordinary custom metadata, not current provenance;
-ExpLedger neither validates them as receipts nor updates them.
-
 ## IDs and creation
 
 `new <slug>` generates `YYYYMMDD-<slug>` using the local date. Slugs use lowercase
@@ -110,9 +62,9 @@ before creating the child. An omitted title is derived from the slug;
 ## Parent references and validation
 
 `new --based-on <id>` requires each named parent to have valid `experiment.yaml`
-metadata and a matching directory ID. Repeat the flag to record multiple parents. Only named
-direct parents are validated; unrelated experiments and their ancestors are not
-read. Parent order is retained.
+metadata and a matching directory ID. Repeat the flag to record multiple parents.
+Only named direct parents are validated; unrelated experiments and their ancestors
+are not read. Parent order is retained.
 
 Parsing checks the document's metadata. Catalog reads and `validate <id>` also
 check its folder identity. They do not resolve its `based_on` references. A readable
@@ -123,10 +75,12 @@ the record or automatically repair its metadata.
 
 `list` reads immediate experiment directories containing `experiment.yaml` and
 sorts by `created_at`, newest first. Equal timestamps retain directory-name order.
-A missing `experiments` directory is an empty catalog. Loose files, nested artifact directories, and
-symlinked child directories are not discovered as experiments. Directories without
-`experiment.yaml` are ignored, regardless of their README contents. A present but unreadable or invalid metadata file fails the operation
-with no partial list; a dangling metadata symlink is an error. `build` and `serve`
+A missing `experiments` directory is an empty catalog. Loose files, nested artifact
+directories, and symlinked child directories are not discovered as experiments.
+Directories without
+`experiment.yaml` are ignored, regardless of their README contents. A present but
+unreadable or invalid metadata file fails the operation with no partial list;
+a dangling metadata symlink is an error. `build` and `serve`
 use the same catalog rules.
 
 The `experiments` directory and directly requested experiment directories must
@@ -139,7 +93,5 @@ not symlinks. Supporting files are not scanned by the runner.
 The internal record codec retains only standard fields. Catalog reads and runs
 do not modify metadata, including custom fields and historical `last_run` values.
 
-The internal packages keep these boundaries: `experiment` owns the record and
-codec; `catalog` owns reading, discovery, and creation; `web` owns rendering and
-HTTP handling; `cli` owns project configuration and command orchestration.
-Records remain ordinary files; no separate index or database is required.
+Records remain ordinary files; no separate index or database is required. See
+[Running experiments](running.md) for the execution contract.

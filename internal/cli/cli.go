@@ -38,10 +38,23 @@ func Run(ctx context.Context, args []string, cwd string, now time.Time, streams 
 	if streams.Err == nil {
 		streams.Err = io.Discard
 	}
+	root := NewCommand(cwd, now)
+	root.SetArgs(append([]string{}, args...))
+	root.SetIn(streams.In)
+	root.SetOut(streams.Out)
+	root.SetErr(streams.Err)
+	return root.ExecuteContext(ctx)
+}
+
+// NewCommand constructs the CLI without discovering a project or executing work.
+// Each invocation returns independent commands and flag state.
+func NewCommand(cwd string, now time.Time) *cobra.Command {
 	app := &application{cwd: cwd, now: now}
 	root := &cobra.Command{
 		Use:           "expledger",
 		Short:         rootDescription,
+		Long:          rootDetails,
+		Example:       "  expledger init\n  expledger new baseline\n  expledger list",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -63,10 +76,6 @@ func Run(ctx context.Context, args []string, cwd string, now time.Time, streams 
 			return err
 		},
 	}
-	root.SetArgs(append([]string{}, args...))
-	root.SetIn(streams.In)
-	root.SetOut(streams.Out)
-	root.SetErr(streams.Err)
 	root.AddCommand(initProjectCommand(app), newExperimentCommand(app), listExperimentsCommand(app), validateExperimentCommand(app), buildExperimentsCommand(app), serveExperimentsCommand(app), runExperimentCommand(app))
-	return root.ExecuteContext(ctx)
+	return root
 }

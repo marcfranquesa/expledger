@@ -151,8 +151,9 @@ func initProjectCommand(app *application) *cobra.Command {
 	var remote string
 	cmd := &cobra.Command{
 		Use: "init", Short: "Initialize an ExpLedger project in the current directory",
-		Long: "Create expledger.yaml in the current directory. Existing valid config is left unchanged.\nUse --remote-url for the full browser URL of the remote experiments directory.",
-		Args: cobra.NoArgs,
+		Long:    "Create expledger.yaml in the current directory. Existing valid config is left unchanged.\nUse --remote-url for the full browser URL of the remote experiments directory.",
+		Example: "  expledger init\n  expledger init --remote-url https://github.com/owner/repo/tree/main/experiments",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateRemoteURL(remote); err != nil {
 				return err

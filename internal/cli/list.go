@@ -13,10 +13,11 @@ import (
 
 func listExperimentsCommand(app *application) *cobra.Command {
 	return &cobra.Command{
-		Use:   "list",
-		Short: listDescription,
-		Long:  listDetails,
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   listDescription,
+		Example: "  expledger list",
+		Long:    listDetails,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			records, err := catalog.List(app.projectRoot)
 			if err != nil {
