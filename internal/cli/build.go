@@ -29,16 +29,12 @@ func buildExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repositoryURL, branch, err := remoteLocation(cmd.Context(), app.repoRoot)
-			if err != nil {
-				return err
-			}
-			records, err := catalog.List(app.repoRoot)
+			records, err := catalog.List(app.projectRoot)
 			if err != nil {
 				return err
 			}
 			body, err := web.Render(records, web.PageOptions{
-				Project: filepath.Base(app.repoRoot), RepositoryURL: repositoryURL, Branch: branch,
+				Project: filepath.Base(app.projectRoot), RemoteURL: app.config.RemoteURL,
 			})
 			if err != nil {
 				return err

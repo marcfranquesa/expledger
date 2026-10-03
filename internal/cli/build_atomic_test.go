@@ -18,8 +18,8 @@ func TestBuildReplacesLinkedOutput(t *testing.T) {
 	}{{"symlink", os.Symlink}, {"hard link", os.Link}} {
 		t.Run(link.name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet", "--initial-branch=main")
-			git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+			initProject(t, root)
+
 			target := filepath.Join(t.TempDir(), "notes.md")
 			notes := []byte("Keep these research notes.\n")
 			if err := os.WriteFile(target, notes, 0o640); err != nil {
@@ -56,8 +56,8 @@ func TestBuildReplacesLinkedOutput(t *testing.T) {
 
 func TestBuildReplacementFailureCleansUp(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+	initProject(t, root)
+
 	dir := filepath.Join(root, "dist")
 	index := filepath.Join(dir, "index.html")
 	if err := os.MkdirAll(index, 0o755); err != nil {
@@ -82,8 +82,8 @@ func TestBuildReplacementFailureCleansUp(t *testing.T) {
 
 func TestBuildPreservesSnapshotPermissions(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+	initProject(t, root)
+
 	dir := filepath.Join(root, "dist")
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)

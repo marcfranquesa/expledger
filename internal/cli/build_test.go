@@ -20,13 +20,13 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	git(t, root, "init", "--quiet", "--initial-branch=research/v2")
-	git(t, root, "remote", "add", "origin", "git@github.com:owner/repo.git")
+	initProject(t, root)
+
 	cwd := filepath.Join(root, "nested")
 	if err := os.Mkdir(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/owner/repo", Branch: "research/v2"})
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/expledger-preview/tree/preview/experiments"})
 	for _, output := range []string{"", "site/output", filepath.Join(t.TempDir(), "absolute")} {
 		args := []string{"build"}
 		dir := output
@@ -62,7 +62,7 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("keep me"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	metadata := filepath.Join(root, "experiments", "20260924-baseline", "expledger.yaml")
+	metadata := filepath.Join(root, "experiments", "20260924-baseline", "experiment.yaml")
 	data, err := os.ReadFile(metadata)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err == nil || !strings.Contains(err.Error(), "expledger.yaml") {
+	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
 		t.Fatalf("invalid catalog error = %v", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, snapshot) || stdout.Len() != 0 {
@@ -105,8 +105,8 @@ func TestBuildSnapshot(t *testing.T) {
 
 func TestBuildEmptyAndOutputErrors(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+	initProject(t, root)
+
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
@@ -134,35 +134,21 @@ func TestBuildEmptyAndOutputErrors(t *testing.T) {
 }
 
 func TestBuildWithoutRemoteLinks(t *testing.T) {
-	for _, tt := range []struct {
-		name, remote string
-		detached     bool
-	}{
-		{name: "no origin"},
-		{name: "non-GitHub origin", remote: "https://gitlab.com/owner/repo.git"},
-		{name: "detached HEAD", remote: "https://github.com/owner/repo.git", detached: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
-			if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
-				t.Fatal(err)
-			}
-			git(t, root, "init", "--quiet", "--initial-branch=main")
-			if tt.remote != "" {
-				git(t, root, "remote", "add", "origin", tt.remote)
-			}
-			if tt.detached {
-				git(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "initial")
-				git(t, root, "checkout", "--quiet", "--detach", "HEAD")
-			}
-			var stdout bytes.Buffer
-			if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
-				t.Fatal(err)
-			}
-			body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
-			if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="remote-link"`)) {
-				t.Fatalf("local snapshot missing or includes remote links: %v\n%s", err, body)
-			}
-		})
+	for _, config := range []string{"{}\n", "remote_url: ''\n"} {
+		root := t.TempDir()
+		if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", t.TempDir())
+		if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{}); err != nil {
+			t.Fatal(err)
+		}
+		body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
+		if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="remote-link"`)) {
+			t.Fatalf("local snapshot: %v", err)
+		}
 	}
 }

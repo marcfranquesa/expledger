@@ -21,8 +21,6 @@ trap 'exit 143' TERM
 cd "$repo_root"
 go build -o "$preview_dir/expledger" ./cmd/expledger
 cp -R testdata/project "$preview_dir/project"
-git -C "$preview_dir/project" init -q -b preview
-git -C "$preview_dir/project" remote add origin https://github.com/example/expledger-preview.git
 
 cd "$preview_dir/project"
 "$preview_dir/expledger" serve "$@" &

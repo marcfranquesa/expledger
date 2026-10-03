@@ -1,22 +1,22 @@
 # ExpLedger
 
-ExpLedger records coding experiments as folders in your Git repository and runs
+ExpLedger records coding experiments as folders in your project and runs
 their `run.sh` scripts in place.
 
 ```text
 experiments/20260924-baseline/
-├── expledger.yaml
+├── experiment.yaml
 ├── README.md
 ├── run.sh
 └── ... supporting files
 ```
 
-ExpLedger discovers only folders containing `expledger.yaml` with
+ExpLedger discovers only folders containing `experiment.yaml` with
 `schema: expledger/v1`.
 
 The [record format](docs/format.md) defines metadata, parent references, and
 filesystem rules. The [running guide](docs/running.md) covers entrypoints and
-recorded project provenance.
+execution behavior.
 
 ExpLedger is in active development. Expect breaking changes.
 
@@ -24,20 +24,53 @@ ExpLedger is in active development. Expect breaking changes.
 
 | Name | Description |
 | --- | --- |
+| `expledger init [--remote-url <url>]` | Initialize the current directory as a project. |
 | `expledger new <slug> [flags]` | Create a dated folder with metadata, notes, and an executable `run.sh` stub. |
-| `expledger run <id>` | Execute the experiment's `run.sh` and record the current project commit and dirty state. |
+| `expledger run <id>` | Execute the experiment's `run.sh` in place without changing metadata. |
 | `expledger list` | List experiment IDs and titles, newest first. |
-| `expledger validate <id>` | Validate an experiment's `expledger.yaml` and check that its ID matches the folder name. |
+| `expledger validate <id>` | Validate an experiment's `experiment.yaml` and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
 | `expledger serve [--port <port>]` | Browse experiments locally with remote links to their folders. |
 | `expledger help [command]` | Show help and available flags. |
 
-`build` and `serve` work in local-only repositories and detached worktrees.
-Remote links appear when `origin` points to GitHub and a branch is checked out.
+Initialize once from your project directory:
+
+```sh
+expledger init
+expledger new baseline
+```
+
+Commands find the nearest `expledger.yaml` in the current directory or its
+parents. There is no Git fallback or implicit initialization. A local-only
+project has a root config containing `{}`. To enable View remote links, initialize
+with the full browser URL of the published **experiments directory**:
+
+```sh
+expledger init --remote-url https://github.com/owner/repo/tree/main/experiments
+```
+
+For an existing project, edit `remote_url` in the root `expledger.yaml` explicitly.
+`build` and `serve` append an escaped experiment ID to that URL. Any HTTP(S)
+host is supported; queries, fragments, and credentials are rejected. An absent
+or empty URL means no remote links. ExpLedger does not infer a branch or contact
+the remote.
+
+## Migration
+
+Rename each existing `experiments/<id>/expledger.yaml` to
+`experiments/<id>/experiment.yaml`, leaving its contents unchanged, then run
+`expledger init` at the project root. Migration is manual; the old experiment
+filename is not supported. An old experiment marker encountered during upward
+root discovery produces a filename-migration error.
+
+ExpLedger no longer records commits, dirty state, or `last_run`. Historical
+`last_run` values remain accepted as custom metadata and are never updated;
+they are not current run provenance.
 
 ## Installation
 
-Requires Go 1.26+ and Git.
+Building requires Go 1.26+; the clone command below uses Git. The installed CLI
+has no Git dependency.
 
 ```sh
 git clone git@github.com:marcfranquesa/expledger.git

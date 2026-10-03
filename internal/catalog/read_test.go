@@ -20,7 +20,7 @@ func TestRead(t *testing.T) {
 		len(record.BasedOn) != 1 || record.BasedOn[0] != "missing" {
 		t.Fatalf("unexpected record: %+v", record)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "experiments", "example", "expledger.yaml"))
+	data, err := os.ReadFile(filepath.Join(root, "experiments", "example", "experiment.yaml"))
 	if err != nil || string(data) != content {
 		t.Fatalf("Read changed metadata: data=%q, err=%v", data, err)
 	}
@@ -30,7 +30,7 @@ func TestReadRejectsMismatchedID(t *testing.T) {
 	root := t.TempDir()
 	writeMetadata(t, root, "20260924-test", "schema: expledger/v1\nid: 20260924-other\ntitle: Test\ncreated_at: 2026-09-24T14:30:00Z\n")
 	_, err := Read(root, "20260924-test")
-	want := "invalid " + filepath.Join("experiments", "20260924-test", "expledger.yaml") + ": YAML id \"20260924-other\" must match folder name \"20260924-test\""
+	want := "invalid " + filepath.Join("experiments", "20260924-test", "experiment.yaml") + ": YAML id \"20260924-other\" must match folder name \"20260924-test\""
 	if err == nil || err.Error() != want {
 		t.Fatalf("Read error = %v, want %q", err, want)
 	}
@@ -40,7 +40,7 @@ func TestReadReportsParseErrorWithPath(t *testing.T) {
 	root := t.TempDir()
 	writeMetadata(t, root, "example", "schema: expledger/v1\nid: [\n")
 	_, err := Read(root, "example")
-	if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "example", "expledger.yaml")) || !strings.Contains(err.Error(), "parse metadata") {
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "example", "experiment.yaml")) || !strings.Contains(err.Error(), "parse metadata") {
 		t.Fatalf("Read error = %v, want metadata path and parser error", err)
 	}
 }
@@ -61,14 +61,14 @@ func TestReadRejectsMetadataOutsideProject(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(outside, "expledger.yaml")
+	target := filepath.Join(outside, "experiment.yaml")
 	if err := os.WriteFile(target, []byte("schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T14:30:00Z\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(dir, "expledger.yaml")); err != nil {
+	if err := os.Symlink(target, filepath.Join(dir, "experiment.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Read(root, "example"); err == nil || !strings.Contains(err.Error(), "read "+filepath.Join("experiments", "example", "expledger.yaml")) {
+	if _, err := Read(root, "example"); err == nil || !strings.Contains(err.Error(), "read "+filepath.Join("experiments", "example", "experiment.yaml")) {
 		t.Fatalf("Read error = %v, want an error reading escaped metadata", err)
 	}
 }

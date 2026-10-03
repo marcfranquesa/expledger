@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) error {
+func executeRun(ctx context.Context, cmd *exec.Cmd) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -26,14 +26,12 @@ func executeRun(ctx context.Context, cmd *exec.Cmd, launched func() error) error
 	}
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
-	interruption := launched()
+	var interruption error
 	var waitErr error
-	if interruption == nil {
-		select {
-		case waitErr = <-done:
-		case <-ctx.Done():
-			interruption = &workloadExit{130}
-		}
+	select {
+	case waitErr = <-done:
+	case <-ctx.Done():
+		interruption = &workloadExit{130}
 	}
 	groupStopped := false
 	if interruption != nil {

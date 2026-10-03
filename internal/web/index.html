@@ -12,7 +12,6 @@
     .brand { margin: 0 0 44px; font-size: 14px; font-weight: 650; letter-spacing: -.02em; }
     h1 { margin: 0; font-size: clamp(30px, 5vw, 40px); font-weight: 600; letter-spacing: -.04em; }
     .context { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; color: #60605a; font-size: 14px; overflow-wrap: anywhere; }
-    .branch { border: 1px solid #dcdcd6; border-radius: 5px; padding: 3px 7px; }
     code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
     .section-heading { margin: 36px 0 0; padding-bottom: 12px; border-bottom: 1px solid #dcdcd6; color: #60605a; font-size: 12px; font-weight: 500; }
     .experiments { list-style: none; margin: 0; padding: 0; }
@@ -38,7 +37,7 @@
     <header>
       <p class="brand">ExpLedger</p>
       <h1>Experiments</h1>
-      <div class="context"><span>{{.Project}}</span>{{if .Branch}}<code class="branch">{{.Branch}}</code>{{end}}</div>
+      <div class="context"><span>{{.Project}}</span></div>
     </header>
     <p class="section-heading">Newest first</p>
     {{if .Experiments}}

@@ -15,161 +15,68 @@ import (
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/cli"
-	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
 const runnerID = "20260924-runner"
 
-func TestRunUsesCurrentFilesInActualExperimentDirectory(t *testing.T) {
-	root, initial := runnerFixture(t)
-	git(t, root, "checkout", "--quiet", "-b", "experiment-runner")
+func TestRunUsesCurrentFilesAndPreservesMetadata(t *testing.T) {
+	root := runnerFixture(t)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("EXPERIMENT_SETTING", "caller setting")
 	runnerWrite(t, runnerPath(root, "run.sh"), `#!/bin/sh
 set -eu
 test "$#" -eq 0
-test -x ./run.sh
 IFS= read -r input
-printf '%s\n' "$PWD"
-cat project-input.txt
-printf 'input: %s\n' "$input"
+printf '%s\n' "$PWD" "$EXPERIMENT_SETTING" "$input"
 printf 'workload stderr\n' >&2
 printf 'local result\n' > result.txt
-`, 0o755)
-	if err := os.Symlink("../../source.txt", runnerPath(root, "project-input.txt")); err != nil {
-		t.Fatal(err)
-	}
-	current := runnerCommit(t, root)
-	runnerWrite(t, filepath.Join(root, "source.txt"), "current uncommitted code\n", 0o644)
-	worktrees := git(t, root, "worktree", "list", "--porcelain")
-	for _, previous := range []string{"", initial, strings.Repeat("f", 40)} {
-		if previous != "" {
-			err := catalog.RecordRun(root, runnerID, experiment.RunReceipt{ProjectCommit: previous, StartedAt: metadataTestTime()})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
+`, 0755)
+	path := runnerPath(root, "experiment.yaml")
+	original := runnerRead(t, path)
+	for _, history := range []string{"", "last_run: historical custom value\n", "last_run:\n  project_commit: old\n  project_dirty: true\n  started_at: 2020-01-01T00:00:00Z\n"} {
+		before := original + history
+		runnerWrite(t, path, before, 0444)
 		var stdout, stderr bytes.Buffer
-		started := time.Now().UTC()
-		err := cli.Run(context.Background(), []string{"run", runnerID}, runnerPath(root, ""), metadataTestTime(), cli.Streams{
-			In: strings.NewReader("fixed input\n"), Out: &stdout, Err: &stderr,
-		})
+		err := cli.Run(context.Background(), []string{"run", runnerID}, runnerPath(root, ""), metadataTestTime(), cli.Streams{In: strings.NewReader("fixed input\n"), Out: &stdout, Err: &stderr})
 		if err != nil {
-			t.Fatalf("run with previous commit %q: %v", previous, err)
+			t.Fatal(err)
 		}
-		want := runnerPath(root, "") + "\ncurrent uncommitted code\ninput: fixed input\n"
-		if stdout.String() != want || !strings.Contains(stderr.String(), "workload stderr\n") {
-			t.Fatalf("unexpected workload streams: stdout=%q, stderr=%q", &stdout, &stderr)
+		if stdout.String() != runnerPath(root, "")+"\ncaller setting\nfixed input\n" || stderr.String() != "workload stderr\n" {
+			t.Fatalf("streams: %q, %q", &stdout, &stderr)
 		}
-		runnerAssertReceipt(t, root, current, true, started)
+		if runnerRead(t, path) != before {
+			t.Fatal("run changed metadata")
+		}
+		if err := os.Chmod(path, 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if got := runnerRead(t, runnerPath(root, "result.txt")); got != "local result\n" {
-		t.Fatalf("result was not written to the actual experiment: %q", got)
-	}
-	if got := runnerRead(t, filepath.Join(root, "source.txt")); got != "current uncommitted code\n" {
-		t.Fatalf("current source changed: %q", got)
-	}
-	if got := git(t, root, "rev-parse", "HEAD"); got != current {
-		t.Fatalf("run moved HEAD to %s, want %s", got, current)
-	}
-	if got := git(t, root, "worktree", "list", "--porcelain"); got != worktrees {
-		t.Fatalf("run changed worktree registrations:\nbefore: %s\nafter: %s", worktrees, got)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".git", "expledger")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("run created runner state in Git's directory: %v", err)
+	if runnerRead(t, runnerPath(root, "result.txt")) != "local result\n" {
+		t.Fatal("result not in experiment directory")
 	}
 }
 
-func TestRunRecordsProjectDirtinessOutsideExperiments(t *testing.T) {
+func TestRunPrelaunchFailuresPreserveMetadata(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
-		dirty  bool
 		change func(*testing.T, string)
 	}{
-		{"experiment-only edits", false, func(t *testing.T, root string) {
-			runnerWrite(t, runnerPath(root, "README.md"), "current notes\n", 0o644)
-		}},
-		{"experiment-only commit", false, func(t *testing.T, root string) { runnerCommit(t, root) }},
-		{"unstaged project edit", true, func(t *testing.T, root string) {
-			runnerWrite(t, filepath.Join(root, "source.txt"), "changed\n", 0o644)
-		}},
-		{"staged project edit", true, func(t *testing.T, root string) {
-			runnerWrite(t, filepath.Join(root, "source.txt"), "changed\n", 0o644)
-			git(t, root, "add", "source.txt")
-		}},
-		{"untracked project file", true, func(t *testing.T, root string) {
-			runnerWrite(t, filepath.Join(root, "untracked.txt"), "new code\n", 0o644)
-		}},
-		{"ignored project file", false, func(t *testing.T, root string) {
-			runnerWrite(t, filepath.Join(root, ".git", "info", "exclude"), "ignored.txt\n", 0o644)
-			runnerWrite(t, filepath.Join(root, "ignored.txt"), "local cache\n", 0o644)
-		}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			root, _ := runnerFixture(t)
-			tt.change(t, root)
-			commit := git(t, root, "rev-parse", "HEAD")
-			started := time.Now().UTC()
-			if err := cli.Run(context.Background(), []string{"run", runnerID}, root, metadataTestTime(), cli.Streams{}); err != nil {
+		{"symlinked runner", func(t *testing.T, root string) {
+			if err := os.Rename(runnerPath(root, "run.sh"), runnerPath(root, "actual.sh")); err != nil {
 				t.Fatal(err)
 			}
-			runnerAssertReceipt(t, root, commit, tt.dirty, started)
-		})
-	}
-}
-
-func TestRunUsesManuallySelectedCheckout(t *testing.T) {
-	root, initial := runnerFixture(t)
-	runnerWrite(t, filepath.Join(root, "source.txt"), "newer committed code\n", 0o644)
-	git(t, root, "add", "source.txt")
-	git(t, root, "commit", "--quiet", "-m", "newer project code")
-	newer := git(t, root, "rev-parse", "HEAD")
-	if err := catalog.RecordRun(root, runnerID, experiment.RunReceipt{ProjectCommit: newer, StartedAt: metadataTestTime()}); err != nil {
-		t.Fatal(err)
-	}
-	git(t, root, "checkout", "--quiet", "--detach", initial)
-	runnerWrite(t, runnerPath(root, "run.sh"), "#!/bin/sh\ncat ../../source.txt\n", 0o755)
-	var stdout bytes.Buffer
-	started := time.Now().UTC()
-	if err := cli.Run(context.Background(), []string{"run", runnerID}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
-		t.Fatal(err)
-	}
-	if stdout.String() != "committed code\n" || git(t, root, "rev-parse", "HEAD") != initial {
-		t.Fatalf("run did not preserve the manually selected checkout: stdout=%q", &stdout)
-	}
-	runnerAssertReceipt(t, root, initial, false, started)
-}
-
-func TestRunPreservesCallerEnvironment(t *testing.T) {
-	root, commit := runnerFixture(t)
-	other, _ := runnerFixture(t)
-	runnerWrite(t, filepath.Join(other, "source.txt"), "other project's code\n", 0o644)
-	runnerCommit(t, other)
-	gitDir := filepath.Join(other, ".git")
-	runnerWrite(t, runnerPath(root, "run.sh"), `#!/bin/sh
-set -eu
-test "$GIT_LITERAL_PATHSPECS" = 1
-cat ../../source.txt
-printf '%s\n' "$GIT_DIR" "$EXPERIMENT_SETTING"
-`, 0o755)
-	t.Setenv("GIT_DIR", gitDir)
-	t.Setenv("GIT_WORK_TREE", other)
-	t.Setenv("GIT_LITERAL_PATHSPECS", "1")
-	t.Setenv("EXPERIMENT_SETTING", "caller setting")
-	var stdout bytes.Buffer
-	started := time.Now().UTC()
-	if err := cli.Run(context.Background(), []string{"run", runnerID}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
-		t.Fatal(err)
-	}
-	if stdout.String() != "committed code\n"+gitDir+"\ncaller setting\n" {
-		t.Fatalf("caller environment changed: %q", &stdout)
-	}
-	runnerAssertReceipt(t, root, commit, false, started)
-}
-
-func TestRunPrelaunchFailuresPreserveReceipt(t *testing.T) {
-	for _, tt := range []struct {
-		name   string
-		change func(*testing.T, string)
-	}{
+			if err := os.Symlink("actual.sh", runnerPath(root, "run.sh")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"symlinked metadata", func(t *testing.T, root string) {
+			if err := os.Rename(runnerPath(root, "experiment.yaml"), runnerPath(root, "actual.yaml")); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("actual.yaml", runnerPath(root, "experiment.yaml")); err != nil {
+				t.Fatal(err)
+			}
+		}},
 		{"missing runner", func(t *testing.T, root string) {
 			if err := os.Remove(runnerPath(root, "run.sh")); err != nil {
 				t.Fatal(err)
@@ -188,19 +95,19 @@ func TestRunPrelaunchFailuresPreserveReceipt(t *testing.T) {
 		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			root, _ := runnerFixture(t)
+			root := runnerFixture(t)
 			if err := cli.Run(context.Background(), []string{"run", runnerID}, root, metadataTestTime(), cli.Streams{}); err != nil {
 				t.Fatal(err)
 			}
-			before := runnerRead(t, runnerPath(root, "expledger.yaml"))
+			before := runnerRead(t, runnerPath(root, "experiment.yaml"))
 			tt.change(t, root)
 			var stdout bytes.Buffer
 			err := cli.Run(context.Background(), []string{"run", runnerID}, root, metadataTestTime(), cli.Streams{Out: &stdout})
 			if err == nil || cli.ExitCode(err) != 1 || stdout.Len() != 0 {
 				t.Fatalf("prelaunch failure = %v, exit=%d, stdout=%q", err, cli.ExitCode(err), &stdout)
 			}
-			if got := runnerRead(t, runnerPath(root, "expledger.yaml")); got != before {
-				t.Fatal("failed process launch replaced the last-run receipt")
+			if got := runnerRead(t, runnerPath(root, "experiment.yaml")); got != before {
+				t.Fatal("failed process launch changed metadata")
 			}
 		})
 	}
@@ -213,9 +120,9 @@ func TestRunBinaryPreservesExitStatusAndCancellation(t *testing.T) {
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build expledger: %v\n%s", err, output)
 	}
-	root, commit := runnerFixture(t)
+	root := runnerFixture(t)
+	before := runnerRead(t, runnerPath(root, "experiment.yaml"))
 	runnerWrite(t, runnerPath(root, "run.sh"), "#!/bin/sh\nprintf 'workload output\\n'\nexit 42\n", 0o755)
-	started := time.Now().UTC()
 	command := exec.Command(binary, "run", runnerID)
 	command.Dir = root
 	var stdout bytes.Buffer
@@ -225,12 +132,13 @@ func TestRunBinaryPreservesExitStatusAndCancellation(t *testing.T) {
 	if !errors.As(err, &exit) || exit.ExitCode() != 42 || stdout.String() != "workload output\n" {
 		t.Fatalf("binary result: err=%v, stdout=%q; want workload output and exit 42", err, &stdout)
 	}
-	runnerAssertReceipt(t, root, commit, false, started)
+	if runnerRead(t, runnerPath(root, "experiment.yaml")) != before {
+		t.Fatal("run changed metadata")
+	}
 
 	runnerWrite(t, runnerPath(root, "run.sh"), "#!/bin/sh\n(sleep 2; printf survived > leaked.txt) &\nprintf ready > ready.txt\nwait\n", 0o755)
 	command = exec.Command(binary, "run", runnerID)
 	command.Dir = root
-	started = time.Now().UTC()
 	if err := command.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +180,9 @@ func TestRunBinaryPreservesExitStatusAndCancellation(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("interrupted workload did not stop promptly")
 	}
-	runnerAssertReceipt(t, root, commit, false, started)
+	if runnerRead(t, runnerPath(root, "experiment.yaml")) != before {
+		t.Fatal("run changed metadata")
+	}
 	if got := runnerRead(t, runnerPath(root, "ready.txt")); got != "ready" {
 		t.Fatalf("cancellation changed experiment files: %q", got)
 	}
@@ -282,7 +192,7 @@ func TestRunBinaryPreservesExitStatusAndCancellation(t *testing.T) {
 	}
 }
 
-func runnerFixture(t *testing.T) (string, string) {
+func runnerFixture(t *testing.T) string {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "project with spaces")
 	if err := os.Mkdir(root, 0o755); err != nil {
@@ -292,24 +202,12 @@ func runnerFixture(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	git(t, root, "init", "--quiet")
-	git(t, root, "config", "user.name", "ExpLedger Test")
-	git(t, root, "config", "user.email", "test@example.invalid")
-	git(t, root, "config", "commit.gpgsign", "false")
-	runnerWrite(t, filepath.Join(root, "source.txt"), "committed code\n", 0o644)
-	commit := runnerCommit(t, root)
+	initProject(t, root)
 	if _, err := catalog.Create(root, "runner", metadataTestTime(), catalog.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	runnerWrite(t, runnerPath(root, "run.sh"), "#!/bin/sh\nexit 0\n", 0o755)
-	return root, commit
-}
-
-func runnerCommit(t *testing.T, root string) string {
-	t.Helper()
-	git(t, root, "add", "--all")
-	git(t, root, "commit", "--quiet", "-m", "test fixture")
-	return git(t, root, "rev-parse", "HEAD")
+	return root
 }
 
 func runnerPath(root, name string) string {
@@ -333,15 +231,4 @@ func runnerRead(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
-}
-
-func runnerAssertReceipt(t *testing.T, root, commit string, dirty bool, started time.Time) {
-	t.Helper()
-	record, err := catalog.Read(root, runnerID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if record.LastRun == nil || record.LastRun.ProjectCommit != commit || record.LastRun.ProjectDirty != dirty || record.LastRun.StartedAt.Before(started) || record.LastRun.StartedAt.After(time.Now()) {
-		t.Fatalf("last_run = %+v, want commit %s, dirty=%v, and a start between %s and now", record.LastRun, commit, dirty, started)
-	}
 }

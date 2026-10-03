@@ -13,7 +13,7 @@ import (
 )
 
 // List reads immediate experiment directories and orders records by creation time, newest first.
-// Directories without expledger.yaml are ignored; metadata IDs must match directory names.
+// Directories without experiment.yaml are ignored; metadata IDs must match directory names.
 // A missing experiments directory is an empty list.
 func List(root string) ([]experiment.Record, error) {
 	project, err := os.OpenRoot(root)
@@ -40,7 +40,7 @@ func List(root string) ([]experiment.Record, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		metadata := filepath.Join("experiments", entry.Name(), "expledger.yaml")
+		metadata := filepath.Join("experiments", entry.Name(), "experiment.yaml")
 		if _, err := project.Lstat(metadata); errors.Is(err, os.ErrNotExist) {
 			continue
 		} else if err != nil {

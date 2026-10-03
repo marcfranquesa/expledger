@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
@@ -22,23 +23,23 @@ type experimentView struct {
 }
 
 type page struct {
-	Project, Branch string
-	Experiments     []experimentView
+	Project     string
+	Experiments []experimentView
 }
 
-// PageOptions supplies display metadata and an optional normalized repository URL.
+// PageOptions supplies display metadata and an optional experiments-directory URL.
 type PageOptions struct {
-	Project, RepositoryURL, Branch string
+	Project, RemoteURL string
 }
 
 // Render renders a complete HTML page with records in their supplied order.
 func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
-	data := page{Project: options.Project, Branch: options.Branch}
+	data := page{Project: options.Project}
 	for _, record := range records {
 		created := record.CreatedAt.UTC()
 		var remoteURL string
-		if options.RepositoryURL != "" && options.Branch != "" {
-			remoteURL = options.RepositoryURL + "/tree/" + url.PathEscape(options.Branch) + "/experiments/" + url.PathEscape(record.ID)
+		if options.RemoteURL != "" {
+			remoteURL = strings.TrimRight(options.RemoteURL, "/") + "/" + url.PathEscape(record.ID)
 		}
 		data.Experiments = append(data.Experiments, experimentView{
 			ID: record.ID, Title: record.Title,

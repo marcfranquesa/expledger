@@ -19,7 +19,7 @@ func TestReadsRelativeMetadataSymlinkWithinProject(t *testing.T) {
 	if err := os.WriteFile(target, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	metadata := filepath.Join(dir, "expledger.yaml")
+	metadata := filepath.Join(dir, "experiment.yaml")
 	relativeTarget := filepath.Join("..", "..", "metadata.yaml")
 	if err := os.Symlink(relativeTarget, metadata); err != nil {
 		t.Fatal(err)

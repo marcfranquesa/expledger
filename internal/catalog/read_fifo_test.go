@@ -19,7 +19,7 @@ func TestRejectsFIFOMetadata(t *testing.T) {
 		_, listErr := List(root)
 		_, createErr := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"pipe"}})
 		for operation, err := range map[string]error{"read": readErr, "list": listErr, "parent": createErr} {
-			if err == nil || !strings.Contains(err.Error(), "regular file") || !strings.Contains(err.Error(), "expledger.yaml") {
+			if err == nil || !strings.Contains(err.Error(), "regular file") || !strings.Contains(err.Error(), "experiment.yaml") {
 				t.Errorf("%s error = %v, want non-regular metadata error", operation, err)
 			}
 		}
@@ -32,7 +32,7 @@ func TestRejectsFIFOMetadata(t *testing.T) {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				t.Fatal(err)
 			}
-			metadata := filepath.Join(dir, "expledger.yaml")
+			metadata := filepath.Join(dir, "experiment.yaml")
 			fifo := metadata
 			if kind != "fifo" {
 				fifo = filepath.Join(dir, "metadata.pipe")

@@ -18,7 +18,7 @@ const validateMetadata = "schema: expledger/v1\nid: " + validateID + "\ntitle: S
 
 func TestValidateFromNestedDirectory(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	cwd := filepath.Join(root, "src", "nested")
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
@@ -30,7 +30,7 @@ func TestValidateFromNestedDirectory(t *testing.T) {
 	if err := cli.Run(context.Background(), []string{"validate", validateID}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/expledger.yaml\n"; got != want {
+	if got, want := stdout.String(), "Valid: experiments/"+validateID+"/experiment.yaml\n"; got != want {
 		t.Fatalf("validate output = %q, want %q", got, want)
 	}
 	data, err := os.ReadFile(metadata)
@@ -52,14 +52,14 @@ func TestValidateRejectsInvalidMetadataWithoutChangingIt(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			metadata := writeMetadata(t, root, validateID, []byte(tt.data))
 			var stdout bytes.Buffer
 			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, cli.Streams{Out: &stdout})
 			if err == nil {
 				t.Fatal("expected validation error")
 			}
-			for _, want := range []string{filepath.Join("experiments", validateID, "expledger.yaml"), tt.reason} {
+			for _, want := range []string{filepath.Join("experiments", validateID, "experiment.yaml"), tt.reason} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("validation error %q does not contain %q", err, want)
 				}
@@ -83,7 +83,7 @@ func TestValidateMissingMetadata(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			dir := filepath.Join(root, "experiments", validateID)
 			if existingFolder {
 				if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -94,7 +94,7 @@ func TestValidateMissingMetadata(t *testing.T) {
 			err := cli.Run(context.Background(), []string{"validate", validateID}, root, time.Time{}, cli.Streams{Out: &stdout})
 			wantPath := filepath.Join("experiments", validateID)
 			if existingFolder {
-				wantPath = filepath.Join(wantPath, "expledger.yaml")
+				wantPath = filepath.Join(wantPath, "experiment.yaml")
 			}
 			if err == nil || !strings.Contains(err.Error(), wantPath) {
 				t.Fatalf("expected error naming missing path %s, got %v", wantPath, err)

@@ -32,10 +32,6 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repositoryURL, branch, err := remoteLocation(cmd.Context(), app.repoRoot)
-			if err != nil {
-				return err
-			}
 			listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 			if err != nil {
 				return fmt.Errorf("start experiment server: %w", err)
@@ -48,8 +44,8 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			server := &http.Server{
-				Handler: web.NewHandler(app.repoRoot, web.PageOptions{
-					Project: filepath.Base(app.repoRoot), RepositoryURL: repositoryURL, Branch: branch,
+				Handler: web.NewHandler(app.projectRoot, web.PageOptions{
+					Project: filepath.Base(app.projectRoot), RemoteURL: app.config.RemoteURL,
 				}),
 				ReadHeaderTimeout: 5 * time.Second,
 			}
