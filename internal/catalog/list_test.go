@@ -86,7 +86,7 @@ func TestListIgnoresFilesSymlinkDirectoriesAndNestedArtifacts(t *testing.T) {
 	root := t.TempDir()
 	writeMetadata(t, root, "20260920-baseline", "schema: expledger/v1\nid: 20260920-baseline\ntitle: Baseline\ncreated_at: 2026-09-20T12:00:00Z\n")
 	writeMetadata(t, root, filepath.Join("20260920-baseline", "artifacts"), "not experiment metadata")
-	if err := os.WriteFile(filepath.Join(root, "experiments", "expledger.yaml"), []byte("loose notes"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "experiments", "experiment.yaml"), []byte("loose notes"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(t.TempDir(), filepath.Join(root, "experiments", "linked")); err != nil {
@@ -105,7 +105,7 @@ func TestListInvalidMetadata(t *testing.T) {
 			writeMetadata(t, root, "a-valid", "schema: expledger/v1\nid: a-valid\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\n")
 			writeMetadata(t, root, "z-invalid", content)
 			records, err := List(root)
-			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "z-invalid", "expledger.yaml")) {
+			if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "z-invalid", "experiment.yaml")) {
 				t.Fatalf("error = %v, want the invalid metadata path", err)
 			}
 			if len(records) != 0 {
@@ -142,14 +142,14 @@ func TestListRejectsMetadataOutsideProject(t *testing.T) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		t.Fatal(err)
 	}
-	target := filepath.Join(outside, "expledger.yaml")
+	target := filepath.Join(outside, "experiment.yaml")
 	if err := os.WriteFile(target, []byte("schema: expledger/v1\nid: linked\ntitle: Outside\ncreated_at: 2026-09-24T12:00:00Z\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(path, "expledger.yaml")); err != nil {
+	if err := os.Symlink(target, filepath.Join(path, "experiment.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := List(root); err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "linked", "expledger.yaml")) {
+	if _, err := List(root); err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "linked", "experiment.yaml")) {
 		t.Fatalf("error = %v, want an error at the escaped metadata path", err)
 	}
 }
@@ -162,7 +162,7 @@ func TestListRejectsMismatchedIDs(t *testing.T) {
 			// Reusing a-valid also checks duplicate metadata in different folders.
 			content := fmt.Sprintf("schema: expledger/v1\nid: %q\ntitle: Notes\ncreated_at: 2026-09-24T12:00:00Z\n", id)
 			writeMetadata(t, root, "z-folder", content)
-			metadata := filepath.Join("experiments", "z-folder", "expledger.yaml")
+			metadata := filepath.Join("experiments", "z-folder", "experiment.yaml")
 			records, err := List(root)
 			if err == nil {
 				t.Fatal("accepted mismatched ID")
@@ -189,7 +189,7 @@ func writeMetadata(t *testing.T, root, name, content string) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "expledger.yaml"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "experiment.yaml"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 }

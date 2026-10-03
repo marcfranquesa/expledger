@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +15,7 @@ import (
 
 func TestNewFromNestedDirectory(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	cwd := filepath.Join(root, "src", "nested")
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
@@ -25,107 +24,22 @@ func TestNewFromNestedDirectory(t *testing.T) {
 	assertNew(t, cwd, root)
 }
 
-func TestNewFromGitWorktree(t *testing.T) {
-	root := t.TempDir()
-	git(t, root, "init", "--quiet")
-	git(t, root, "-c", "user.name=ExpLedger Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "initial")
-	worktree := filepath.Join(t.TempDir(), "worktree")
-	git(t, root, "worktree", "add", "--quiet", "--detach", worktree)
-
-	assertNew(t, worktree, worktree)
-	if _, err := os.Stat(filepath.Join(root, "experiments")); !os.IsNotExist(err) {
-		t.Fatalf("primary checkout should have no experiments directory; stat error: %v", err)
-	}
-}
-
-func TestCommandsOutsideGit(t *testing.T) {
-	for _, command := range []string{"new", "run"} {
-		t.Run(command, func(t *testing.T) {
-			root := t.TempDir()
-			var stdout bytes.Buffer
-			err := cli.Run(context.Background(), []string{command, "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
-			if err == nil {
-				t.Fatal("expected error outside a Git worktree")
-			}
-			for _, want := range []string{root, "Git repository", "existing", "git init"} {
-				if !strings.Contains(err.Error(), want) {
-					t.Errorf("outside-repository error %q does not contain %q", err, want)
-				}
-			}
-			if strings.Contains(err.Error(), "exit status 128") {
-				t.Errorf("outside-repository error exposes Git's exit status: %v", err)
-			}
-			if stdout.Len() != 0 {
-				t.Errorf("failed command wrote to stdout: %q", stdout.String())
-			}
-			assertEmptyDirectory(t, root)
-		})
+func TestCommandsWithoutProject(t *testing.T) {
+	for _, args := range [][]string{{"new", "idea"}, {"run", "idea"}, {"list"}, {"validate", "idea"}, {"build"}, {"serve"}} {
+		root := t.TempDir()
+		err := cli.Run(context.Background(), args, root, time.Now(), cli.Streams{})
+		if err == nil || !strings.Contains(err.Error(), "expledger init") {
+			t.Fatalf("%v: %v", args, err)
+		}
+		assertEmptyDirectory(t, root)
 	}
 }
 
 func TestNewWithoutGit(t *testing.T) {
 	root := t.TempDir()
+	initProject(t, root)
 	t.Setenv("PATH", t.TempDir())
-	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
-	if !errors.Is(err, exec.ErrNotFound) {
-		t.Fatalf("missing-Git error = %v, want wrapped exec.ErrNotFound", err)
-	}
-	if strings.Contains(err.Error(), "git init") {
-		t.Errorf("missing-Git error incorrectly suggests initializing a repository: %v", err)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("failed command wrote to stdout: %q", stdout.String())
-	}
-	assertEmptyDirectory(t, root)
-}
-
-func TestNewInBareRepository(t *testing.T) {
-	root := t.TempDir()
-	git(t, root, "init", "--bare", "--quiet")
-	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("bare-repository error = %v, want wrapped exec.ExitError", err)
-	}
-	if !strings.Contains(err.Error(), "work tree") {
-		t.Errorf("bare-repository error omits Git's working-tree diagnostic: %v", err)
-	}
-	if strings.Contains(err.Error(), "git init") || strings.Contains(err.Error(), "not a git repository") {
-		t.Errorf("bare-repository error incorrectly describes a missing repository: %v", err)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("failed command wrote to stdout: %q", stdout.String())
-	}
-	if _, err := os.Stat(filepath.Join(root, "experiments")); !os.IsNotExist(err) {
-		t.Fatalf("failed command should not create experiments directory; stat error: %v", err)
-	}
-}
-
-func TestNewWithInvalidGitDirectory(t *testing.T) {
-	root := t.TempDir()
-	git(t, root, "init", "--quiet")
-	missing := filepath.Join(root, "missing.git")
-	t.Setenv("GIT_DIR", missing)
-	var stdout bytes.Buffer
-	err := cli.Run(context.Background(), []string{"new", "my-idea"}, root, time.Now(), cli.Streams{Out: &stdout})
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("invalid-GIT_DIR error = %v, want wrapped exec.ExitError", err)
-	}
-	if !strings.Contains(err.Error(), missing) {
-		t.Errorf("invalid-GIT_DIR error omits the invalid path: %v", err)
-	}
-	if strings.Contains(err.Error(), "no Git repository found") || strings.Contains(err.Error(), "git init") {
-		t.Errorf("invalid-GIT_DIR error incorrectly suggests creating a repository: %v", err)
-	}
-	if stdout.Len() != 0 {
-		t.Errorf("failed command wrote to stdout: %q", stdout.String())
-	}
-	if _, err := os.Stat(filepath.Join(root, "experiments")); !os.IsNotExist(err) {
-		t.Fatalf("failed command should not create experiments directory; stat error: %v", err)
-	}
+	assertNew(t, root, root)
 }
 
 func TestRootHelp(t *testing.T) {
@@ -162,6 +76,7 @@ func TestCommandHelp(t *testing.T) {
 		name, argument string
 		helpText       []string
 	}{
+		{name: "init", helpText: []string{"--remote-url"}},
 		{name: "new", argument: "<slug>"},
 		{name: "validate", argument: "<id>"},
 		{name: "run", argument: "<id>", helpText: []string{"run.sh"}},
@@ -199,7 +114,7 @@ func TestCommandHelp(t *testing.T) {
 
 func TestRunDoesNotRetainCommandState(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"new", "--help"}, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
@@ -216,7 +131,7 @@ func TestRunDoesNotRetainCommandState(t *testing.T) {
 	}
 }
 
-func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
+func TestUsageErrorsPrecedeProjectLookup(t *testing.T) {
 	for _, args := range [][]string{
 		{"unknown"},
 		{"--unknown"},
@@ -251,8 +166,8 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 			if err == nil {
 				t.Fatalf("expected a usage error for %q", args)
 			}
-			if errors.Is(err, exec.ErrNotFound) || strings.Contains(err.Error(), "find Git") {
-				t.Fatalf("Git lookup ran before argument validation: %v", err)
+			if strings.Contains(err.Error(), "expledger init") {
+				t.Fatalf("Project lookup ran before argument validation: %v", err)
 			}
 			if stdout.Len() != 0 {
 				t.Fatalf("invalid command printed output: %q", stdout.String())
@@ -262,15 +177,15 @@ func TestUsageErrorsPrecedeGitLookup(t *testing.T) {
 	}
 }
 
-func TestRunDoesNotRetainRepositoryRoot(t *testing.T) {
+func TestRunDoesNotRetainProjectRoot(t *testing.T) {
 	for range 2 {
 		root := t.TempDir()
-		git(t, root, "init", "--quiet")
+		initProject(t, root)
 		assertNew(t, root, root)
 	}
 }
 
-func TestRunCanceledBeforeGitLookup(t *testing.T) {
+func TestRunCanceledBeforeProjectLookup(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("PATH", t.TempDir())
 	ctx, cancel := context.WithCancel(context.Background())
@@ -311,22 +226,18 @@ func assertNew(t *testing.T, cwd, root string) {
 	if got := strings.TrimSpace(stdout.String()); got != want {
 		t.Fatalf("created path = %q, want %q", got, want)
 	}
-	for _, filename := range []string{"expledger.yaml", "README.md"} {
+	for _, filename := range []string{"experiment.yaml", "README.md"} {
 		if _, err := os.Stat(filepath.Join(want, filename)); err != nil {
 			t.Fatalf("experiment %s: %v", filename, err)
 		}
 	}
 }
 
-func git(t *testing.T, cwd string, args ...string) string {
+func initProject(t *testing.T, root string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = cwd
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
+	if err := cli.Run(context.Background(), []string{"init"}, root, time.Time{}, cli.Streams{}); err != nil {
+		t.Fatal(err)
 	}
-	return strings.TrimSpace(string(out))
 }
 
 func writeREADME(t *testing.T, root, id string, data []byte) string {
@@ -348,7 +259,7 @@ func writeMetadata(t *testing.T, root, id string, data []byte) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	metadata := filepath.Join(dir, "expledger.yaml")
+	metadata := filepath.Join(dir, "experiment.yaml")
 	if err := os.WriteFile(metadata, data, 0o644); err != nil {
 		t.Fatal(err)
 	}

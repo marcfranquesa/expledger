@@ -11,9 +11,10 @@ import (
 )
 
 type application struct {
-	cwd      string
-	repoRoot string
-	now      time.Time
+	cwd         string
+	projectRoot string
+	now         time.Time
+	config      projectConfig
 }
 
 // Streams connects the command and its workload to the caller's input and output.
@@ -54,8 +55,11 @@ func Run(ctx context.Context, args []string, cwd string, now time.Time, streams 
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
+			if cmd.Name() == "init" {
+				return nil
+			}
 			var err error
-			app.repoRoot, err = gitRoot(cmd.Context(), cwd, cmd.Name() == "run")
+			app.projectRoot, app.config, err = discoverProject(cwd)
 			return err
 		},
 	}
@@ -63,6 +67,6 @@ func Run(ctx context.Context, args []string, cwd string, now time.Time, streams 
 	root.SetIn(streams.In)
 	root.SetOut(streams.Out)
 	root.SetErr(streams.Err)
-	root.AddCommand(newExperimentCommand(app), listExperimentsCommand(app), validateExperimentCommand(app), buildExperimentsCommand(app), serveExperimentsCommand(app), runExperimentCommand(app))
+	root.AddCommand(initProjectCommand(app), newExperimentCommand(app), listExperimentsCommand(app), validateExperimentCommand(app), buildExperimentsCommand(app), serveExperimentsCommand(app), runExperimentCommand(app))
 	return root.ExecuteContext(ctx)
 }

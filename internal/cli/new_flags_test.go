@@ -38,7 +38,7 @@ func TestNewMetadataFlags(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			createMetadataParent(t, root, "baseline", 20)
 			createMetadataParent(t, root, "comparison", 21)
 			var stdout bytes.Buffer
@@ -76,7 +76,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			var stdout bytes.Buffer
 			args := append([]string{"new", "my-idea"}, tt.flags...)
 			if err := cli.Run(context.Background(), args, root, metadataTestTime(), cli.Streams{Out: &stdout}); err == nil {
@@ -89,7 +89,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(entries) != 1 || entries[0].Name() != ".git" {
+			if len(entries) != 1 || entries[0].Name() != "expledger.yaml" {
 				t.Fatalf("invalid metadata unexpectedly created files: %v", entries)
 			}
 		})
@@ -98,7 +98,7 @@ func TestNewRejectsEmptyMetadataFlags(t *testing.T) {
 
 func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	createMetadataParent(t, root, "baseline", 20)
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"new", "first-idea", "--title", "Custom title", "--based-on", "20260920-baseline"}, root, metadataTestTime(), cli.Streams{Out: &stdout}); err != nil {
@@ -123,7 +123,7 @@ func TestNewMetadataFlagsDoNotLeakBetweenRuns(t *testing.T) {
 
 func TestNewRejectsExistingExperiment(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	dir, err := catalog.Create(root, "my-idea", metadataTestTime(), catalog.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func createMetadataParent(t *testing.T, root, slug string, day int) {
 
 func readNewRecord(t *testing.T, root, slug string) experiment.Record {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(root, "experiments", "20260924-"+slug, "expledger.yaml"))
+	data, err := os.ReadFile(filepath.Join(root, "experiments", "20260924-"+slug, "experiment.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

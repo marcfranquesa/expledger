@@ -25,7 +25,7 @@ func TestCreate(t *testing.T) {
 	if want := filepath.Join(root, "experiments", "20260924-my-idea"); dir != want {
 		t.Fatalf("directory = %q, want %q", dir, want)
 	}
-	path := filepath.Join(dir, "expledger.yaml")
+	path := filepath.Join(dir, "experiment.yaml")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -69,9 +69,9 @@ func TestCreateScaffoldsExecutableRunner(t *testing.T) {
 	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 || !strings.Contains(string(output), "Configure run.sh") {
 		t.Fatalf("placeholder result = %q, %v; want configuration guidance and exit 1", output, err)
 	}
-	record, err := Read(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir))
-	if err != nil || record.LastRun != nil {
-		t.Fatalf("new experiment has unexpected run metadata: receipt=%+v, err=%v", record.LastRun, err)
+	_, err = Read(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir))
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -189,7 +189,7 @@ func TestCreateStoresParentMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "expledger.yaml"))
+	data, err := os.ReadFile(filepath.Join(dir, "experiment.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestCreateUsesLocalDateAndUTCTimestamp(t *testing.T) {
 			if err != nil || dir != filepath.Join(root, "experiments", tt.id) {
 				t.Fatalf("directory = %q, err=%v; want ID %q", dir, err, tt.id)
 			}
-			data, err := os.ReadFile(filepath.Join(dir, "expledger.yaml"))
+			data, err := os.ReadFile(filepath.Join(dir, "experiment.yaml"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -275,7 +275,7 @@ func TestCreateRejectsInvalidParentRecord(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
 			writeMetadata(t, root, tt.folder, tt.metadata)
-			metadata := filepath.Join(root, "experiments", tt.folder, "expledger.yaml")
+			metadata := filepath.Join(root, "experiments", tt.folder, "experiment.yaml")
 			notes := filepath.Join(filepath.Dir(metadata), "notes.md")
 			if err := os.WriteFile(notes, []byte("Existing parent notes.\n"), 0644); err != nil {
 				t.Fatal(err)
@@ -285,7 +285,7 @@ func TestCreateRejectsInvalidParentRecord(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"baseline"}}); dir != "" || err == nil || !strings.Contains(err.Error(), `check parent experiment "baseline"`) || !strings.Contains(err.Error(), filepath.Join("experiments", "baseline", "expledger.yaml")) {
+			if dir, err := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"baseline"}}); dir != "" || err == nil || !strings.Contains(err.Error(), `check parent experiment "baseline"`) || !strings.Contains(err.Error(), filepath.Join("experiments", "baseline", "experiment.yaml")) {
 				t.Fatalf("Create = %q, %v; want invalid parent error", dir, err)
 			}
 			entries, err := os.ReadDir(filepath.Join(root, "experiments"))
@@ -318,7 +318,7 @@ func TestCreateChecksOnlyDirectParents(t *testing.T) {
 				root := t.TempDir()
 				writeMetadata(t, root, "baseline", "schema: expledger/v1\nid: baseline\ntitle: Baseline\ncreated_at: 2026-09-24T12:00:00Z\nbased_on: [missing-ancestor]\n")
 				writeMetadata(t, root, "unrelated", content)
-				metadata := filepath.Join(root, "experiments", "unrelated", "expledger.yaml")
+				metadata := filepath.Join(root, "experiments", "unrelated", "experiment.yaml")
 				if content == "" {
 					if err := os.Remove(metadata); err != nil {
 						t.Fatal(err)

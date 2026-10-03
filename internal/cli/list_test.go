@@ -19,7 +19,7 @@ func TestListFromNestedDirectory(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	cwd := filepath.Join(root, "src", "nested")
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestListPreservesIDs(t *testing.T) {
 	} {
 		t.Run(tc.display, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			writeListRecord(t, root, tc.id, experiment.Record{Schema: experiment.Schema, ID: tc.id, Title: "Title", CreatedAt: metadataTestTime()})
 			var stdout bytes.Buffer
 			if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
@@ -98,7 +98,7 @@ func TestListFormatsTitles(t *testing.T) {
 	} {
 		t.Run(tc.display, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			writeListRecord(t, root, "20260924-record", experiment.Record{Schema: experiment.Schema, ID: "20260924-record", Title: tc.title, CreatedAt: metadataTestTime()})
 			var stdout bytes.Buffer
 			if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
@@ -120,7 +120,7 @@ func TestListEmpty(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
-			git(t, root, "init", "--quiet")
+			initProject(t, root)
 			dir := filepath.Join(root, "experiments")
 			if existing {
 				if err := os.Mkdir(dir, 0o755); err != nil {
@@ -145,12 +145,12 @@ func TestListEmpty(t *testing.T) {
 
 func TestListInvalidMetadata(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	writeListRecord(t, root, "20260924-valid", experiment.Record{Schema: experiment.Schema, ID: "20260924-valid", Title: "Valid", CreatedAt: metadataTestTime()})
 	writeMetadata(t, root, "z-invalid", []byte("schema: expledger/v1\nid: [invalid]\ntitle: Invalid\ncreated_at: 2026-09-24T12:00:00Z\n"))
 	var stdout bytes.Buffer
 	err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, cli.Streams{Out: &stdout})
-	if err == nil || !strings.Contains(err.Error(), filepath.Join("z-invalid", "expledger.yaml")) {
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("z-invalid", "experiment.yaml")) {
 		t.Fatalf("expected invalid metadata path in error, got %v", err)
 	}
 	if stdout.Len() != 0 {
@@ -160,7 +160,7 @@ func TestListInvalidMetadata(t *testing.T) {
 
 func TestListCoexistsWithOtherTools(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	const id = "20260924-shared"
 	writeListRecord(t, root, id, experiment.Record{Schema: experiment.Schema, ID: id, Title: "ExpLedger title", CreatedAt: metadataTestTime()})
 	const readmeContent = "---\nlabexp:\n  run_id: abc123\n  title: LabExp title\n---\n# Shared experiment notes\n"
@@ -188,7 +188,7 @@ func TestListCoexistsWithOtherTools(t *testing.T) {
 
 func TestListRejectsMismatchedID(t *testing.T) {
 	root := t.TempDir()
-	git(t, root, "init", "--quiet")
+	initProject(t, root)
 	writeListRecord(t, root, "20260922-valid", experiment.Record{Schema: experiment.Schema, ID: "20260922-valid", Title: "Valid", CreatedAt: metadataTestTime()})
 	const folder = "20260924-renamed"
 	const id = "20260924-original"
@@ -198,7 +198,7 @@ func TestListRejectsMismatchedID(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for experiment ID differing from its folder")
 	}
-	for _, want := range []string{filepath.Join("experiments", folder, "expledger.yaml"), folder, id} {
+	for _, want := range []string{filepath.Join("experiments", folder, "experiment.yaml"), folder, id} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want %q", err, want)
 		}
@@ -208,11 +208,11 @@ func TestListRejectsMismatchedID(t *testing.T) {
 	}
 }
 
-func TestListOutsideGit(t *testing.T) {
+func TestListWithoutProject(t *testing.T) {
 	root := t.TempDir()
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"list"}, root, time.Time{}, cli.Streams{Out: &stdout}); err == nil {
-		t.Fatal("expected error outside a Git worktree")
+		t.Fatal("expected error outside an initialized project")
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("failed list printed output: %q", stdout.String())

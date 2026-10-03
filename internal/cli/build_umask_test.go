@@ -26,8 +26,8 @@ func TestBuildHonorsUmask(t *testing.T) {
 	}
 	syscall.Umask(0o077)
 	root := t.TempDir()
-	git(t, root, "init", "--quiet", "--initial-branch=main")
-	git(t, root, "remote", "add", "origin", "https://github.com/owner/repo.git")
+	initProject(t, root)
+
 	var stdout bytes.Buffer
 	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)

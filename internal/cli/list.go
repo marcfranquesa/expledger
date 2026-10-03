@@ -18,7 +18,7 @@ func listExperimentsCommand(app *application) *cobra.Command {
 		Long:  listDetails,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			records, err := catalog.List(app.repoRoot)
+			records, err := catalog.List(app.projectRoot)
 			if err != nil {
 				return err
 			}

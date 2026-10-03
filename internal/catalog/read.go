@@ -31,7 +31,7 @@ func checkExperimentDirectory(project *os.Root, id string) error {
 	for _, path := range []string{"experiments", filepath.Join("experiments", id)} {
 		info, err := project.Lstat(path)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "expledger.yaml"), err)
+			return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "experiment.yaml"), err)
 		}
 		if !info.IsDir() {
 			return fmt.Errorf("%s must be a directory, not a file or symlink", path)
@@ -47,11 +47,11 @@ func checkExperimentDirectory(project *os.Root, id string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "expledger.yaml"), os.ErrNotExist)
+	return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "experiment.yaml"), os.ErrNotExist)
 }
 
 func readRecord(project *os.Root, id string) (experiment.Record, error) {
-	metadata := filepath.Join("experiments", id, "expledger.yaml")
+	metadata := filepath.Join("experiments", id, "experiment.yaml")
 	info, err := project.Stat(metadata)
 	if err != nil {
 		return experiment.Record{}, fmt.Errorf("read %s: %w", metadata, err)

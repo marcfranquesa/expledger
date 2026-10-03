@@ -13,7 +13,7 @@ import (
 
 func TestExperiments(t *testing.T) {
 	root := filepath.Join("..", "..", "testdata", "project")
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "research/next"})
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/research%2Fnext/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK {
@@ -27,7 +27,6 @@ func TestExperiments(t *testing.T) {
 		"Sep 24, 2026 · 11:45:00 UTC",
 		`datetime="2026-09-24T10:30:00Z"`,
 		"Sep 24, 2026 · 10:30:00 UTC",
-		"research/next",
 		filepath.Base(root),
 	} {
 		if !strings.Contains(body, want) {
@@ -53,7 +52,7 @@ func TestExperiments(t *testing.T) {
 	if got := response.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Errorf("Content-Type = %q", got)
 	}
-	for _, filename := range []string{"README.md", "expledger.yaml"} {
+	for _, filename := range []string{"README.md", "experiment.yaml"} {
 		response := httptest.NewRecorder()
 		path := "/experiments/20260924-baseline/" + filename
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
@@ -68,13 +67,13 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "main"})
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
 		t.Fatalf("initial response: %d %s", response.Code, response.Body)
 	}
-	metadata := filepath.Join(root, "experiments", "20260924-baseline", "expledger.yaml")
+	metadata := filepath.Join(root, "experiments", "20260924-baseline", "experiment.yaml")
 	data, err := os.ReadFile(metadata)
 	if err != nil {
 		t.Fatal(err)
@@ -96,16 +95,16 @@ func TestRefreshRecoversAfterMetadataRepair(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	metadata := filepath.Join(dir, "expledger.yaml")
+	metadata := filepath.Join(dir, "experiment.yaml")
 	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	handler := web.NewHandler(root, web.PageOptions{
-		Project: "Example", RepositoryURL: "https://github.com/example/project", Branch: "main",
+		Project: "Example", RemoteURL: "https://github.com/example/project/tree/main/experiments/",
 	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "expledger.yaml") {
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "experiment.yaml") {
 		t.Fatalf("invalid metadata response: %d %s", response.Code, response.Body)
 	}
 	if response.Header().Get("Cache-Control") != "no-store" {
@@ -127,13 +126,13 @@ func TestEmptyCatalogAndRoutes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("Private repository file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RepositoryURL: "https://github.com/example/project", Branch: "main"})
+	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No experiments yet") || !strings.Contains(response.Body.String(), "expledger new my-idea") {
 		t.Fatalf("empty catalog response: %d %s", response.Code, response.Body)
 	}
-	for _, path := range []string{"/README.md", "/experiments/one/README.md", "/experiments/one/expledger.yaml", "/missing"} {
+	for _, path := range []string{"/README.md", "/experiments/one/README.md", "/experiments/one/experiment.yaml", "/missing"} {
 		t.Run(path, func(t *testing.T) {
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))

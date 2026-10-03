@@ -9,10 +9,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
-	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +29,7 @@ func runExperimentCommand(app *application) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return runExperiment(ctx, cmd, app.repoRoot, args[0])
+			return runExperiment(ctx, cmd, app.projectRoot, args[0])
 		},
 	}
 }
@@ -46,7 +44,7 @@ func runExperiment(ctx context.Context, cli *cobra.Command, root, id string) err
 	}
 	defer project.Close()
 	experimentPath := filepath.Join("experiments", id)
-	for _, name := range []string{"expledger.yaml", "run.sh"} {
+	for _, name := range []string{"experiment.yaml", "run.sh"} {
 		info, err := project.Lstat(filepath.Join(experimentPath, name))
 		if err != nil {
 			return fmt.Errorf("experiment requires %s: %w", name, err)
@@ -58,24 +56,10 @@ func runExperiment(ctx context.Context, cli *cobra.Command, root, id string) err
 			return errors.New("run.sh must be executable; run chmod +x on the experiment's run.sh")
 		}
 	}
-	commit, err := runGit(ctx, root, "rev-parse", "--verify", "HEAD^{commit}")
-	if err != nil {
-		return fmt.Errorf("read HEAD for run provenance: %w", err)
-	}
-	status, err := runGit(ctx, root, "status", "--porcelain=v1", "--untracked-files=normal", "--ignore-submodules=none", "--", ".", ":(top,exclude)experiments")
-	if err != nil {
-		return fmt.Errorf("read project changes: %w", err)
-	}
 	process := exec.Command("./run.sh")
 	process.Dir = filepath.Join(root, experimentPath)
 	process.Stdin, process.Stdout, process.Stderr = cli.InOrStdin(), cli.OutOrStdout(), cli.ErrOrStderr()
-	return executeRun(ctx, process, func() error {
-		receipt := experiment.RunReceipt{ProjectCommit: commit, ProjectDirty: status != "", StartedAt: time.Now().UTC()}
-		if err := catalog.RecordRun(root, id, receipt); err != nil {
-			return fmt.Errorf("workload launched but last_run could not be saved: %w", err)
-		}
-		return nil
-	})
+	return executeRun(ctx, process)
 }
 
 type workloadExit struct{ code int }

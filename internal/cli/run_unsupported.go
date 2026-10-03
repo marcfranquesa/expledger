@@ -8,6 +8,6 @@ import (
 	"os/exec"
 )
 
-func executeRun(context.Context, *exec.Cmd, func() error) error {
+func executeRun(context.Context, *exec.Cmd) error {
 	return errors.New("expledger run requires macOS or Linux")
 }
