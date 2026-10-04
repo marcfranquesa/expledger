@@ -42,9 +42,9 @@
     .graph-scroll { cursor: grab; height: max(320px, calc(100dvh - 250px)); overflow: auto; background: #f5f5f2; }
     .graph-stage { position: relative; overflow: hidden; }
     .graph-canvas { position: absolute; top: 0; left: 0; transform-origin: top left; }
-    .graph-rows { position: relative; }
-    .graph-component { width: max-content; position: absolute; display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 0 24px 36px 0; }
-    .graph-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 32px 16px; max-width: 904px; }
+    .graph-rows { --graph-gap: 32px; position: relative; }
+    .graph-component { width: max-content; position: absolute; display: flex; flex-direction: column; align-items: center; gap: var(--graph-gap); padding: 0 24px 36px 0; }
+    .graph-row { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--graph-gap) 16px; max-width: 904px; }
     .graph-node { width: 168px; height: 48px; flex: none; padding: 8px 10px; border: 1px solid #c9c9c1; border-radius: 5px; background: white; min-width: 0; cursor: pointer; }
     .graph-node h2 { font-size: 13px; line-height: 15px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .graph-node.missing { border-style: dashed; background: #fafaf9; }
@@ -184,15 +184,17 @@
     for (let i = components.length - 1; i >= 0; i--) {
       if (components[i].length === 1 && neighbors.get(components[i][0]).length === 0) components.splice(i, 1);
     }
-    components.sort((a, b) => b.length - a.length);
+    const created = node => Date.parse(node.querySelector('time')?.dateTime || '') || 0;
+    const newestFirst = (a, b) => created(b) - created(a) || +a.dataset.node - +b.dataset.node;
     if (isolated.length) components.push(isolated);
+    components.sort((a, b) => Math.max(...b.map(created)) - Math.max(...a.map(created)) || +a[0].dataset.node - +b[0].dataset.node);
     if (rows) {
       rows.replaceChildren();
       components.forEach(members => {
         const component = document.createElement('div');
         component.className = 'graph-component';
         const ranks = new Map();
-        members.sort((a, b) => +a.dataset.node - +b.dataset.node).forEach(node => {
+        members.sort(newestFirst).forEach(node => {
           const rank = +node.dataset.rank;
           if (!ranks.has(rank)) ranks.set(rank, []);
           ranks.get(rank).push(node);
@@ -208,7 +210,7 @@
           const row = document.createElement('div');
           row.className = 'graph-row';
           row.append(...members);
-          component.append(row);
+          component.prepend(row);
         });
         rows.append(component);
       });
@@ -264,32 +266,32 @@
       const origin = canvas.getBoundingClientRect();
       const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
       const boxes = new Map(nodes.map(node => [node, box(node)]));
-      const lanes = new Map();
+
       const rowGap = parseFloat(getComputedStyle(graph.querySelector('.graph-row')).rowGap);
       paths.forEach(path => {
         const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
         const a = boxes.get(from), b = boxes.get(to), group = from.closest('.graph-component');
-        const x = a.x+a.w/2, y = a.y+a.h, tx = b.x+b.w/2;
+        const x = a.x+a.w/2, y = a.y, tx = b.x+b.w/2, end = b.y+b.h;
         const sameRow = from.dataset.rank === to.dataset.rank;
         path.classList.toggle('cycle', sameRow);
-        const lane = lanes.get(group) || 0;
         let d;
         if (from === to) {
-          d = `M ${x-8} ${y} C ${x-30} ${y+32}, ${x+30} ${y+32}, ${x+8} ${y}`;
+          const bottom = a.y + a.h;
+          d = `M ${x-8} ${bottom} C ${x-30} ${bottom+12}, ${x+30} ${bottom+12}, ${x+8} ${bottom}`;
         } else if (sameRow && a.y === b.y) {
-          const gutter = y + 10 + (lane % 3) * 5;
-          lanes.set(group, lane + 1);
-          d = `M ${x-6} ${y} V ${gutter} H ${tx+6} V ${b.y+b.h}`;
-        } else if (sameRow || +to.dataset.rank > +from.dataset.rank + 1 || b.y - y > rowGap + 1) {
+          const bottom = a.y + a.h, gutter = bottom + 8;
+          d = `M ${x-6} ${bottom} V ${gutter} H ${tx+6} V ${end}`;
+        } else if (sameRow || +to.dataset.rank > +from.dataset.rank + 1 || y - end > rowGap + 1) {
           const right = Math.max(...[...group.querySelectorAll('[data-node]')].map(node => { const r = boxes.get(node); return r.x+r.w; }));
-          const side = right + 12 + (lane % 6) * 8;
-          lanes.set(group, lane + 1);
-          const end = sameRow ? b.y + b.h : b.y;
-          const gutter = sameRow ? end + 16 : end - 12;
-          d = `M ${x} ${y} V ${y+16} H ${side} V ${gutter} H ${tx} V ${end}`;
+          // Shared trunks collapse parallel routes; each edge keeps its own endpoints for highlighting.
+          const side = right + 16;
+          const start = sameRow ? a.y + a.h : y;
+          const gutter = sameRow ? start + 8 : start - 16;
+          const targetGutter = end + (sameRow ? 8 : 16);
+          d = `M ${x} ${start} V ${gutter} H ${side} V ${targetGutter} H ${tx} V ${end}`;
         } else {
-          const mid = (y + b.y) / 2;
-          d = `M ${x} ${y} C ${x} ${mid}, ${tx} ${mid}, ${tx} ${b.y}`;
+          const mid = (y + end) / 2;
+          d = `M ${x} ${y} V ${mid} H ${tx} V ${end}`;
         }
         path.setAttribute('d', d);
       });
