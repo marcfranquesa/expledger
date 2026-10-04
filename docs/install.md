@@ -61,5 +61,7 @@ go build -o /tmp/expledger ./cmd/expledger
 /tmp/expledger --version
 ```
 
-This is a development build. See the [release policy](releases.md) for version
-and compatibility rules, and the [running guide](running.md) for project use.
+A clean tagged checkout reports its tag when Go embeds that version metadata;
+untagged or dirty checkouts report a development identity. See the
+[release policy](releases.md) for version and compatibility rules, and the
+[running guide](running.md) for project use.
