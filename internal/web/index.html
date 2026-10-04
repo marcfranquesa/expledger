@@ -28,12 +28,11 @@
     .view-controls button { font: inherit; font-size: 13px; padding: 8px 16px; border: 1px solid #d4d4ce; border-radius: 6px; background: white; color: #33332e; cursor: pointer; }
     .view-controls button[aria-pressed="true"] { background: #33332e; color: white; border-color: #33332e; }
     :focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
-    .graph-help { color: #60605a; font-size: 13px; line-height: 1.6; }
-    .graph-scroll { overflow: auto; max-height: 75vh; border: 1px solid #dcdcd6; border-radius: 8px; background: #f5f5f2; }
+    .graph-scroll { margin-top: 24px; overflow-x: auto; border: 1px solid #dcdcd6; border-radius: 8px; background: #f5f5f2; }
     .graph-canvas { position: relative; width: max-content; min-width: 100%; }
-    .graph-columns { display: flex; gap: 88px; padding: 36px 64px 36px 24px; position: relative; }
-    .graph-column { width: 248px; flex: none; display: flex; flex-direction: column; gap: 32px; }
-    .graph-node { padding: 16px; border: 1px solid #c9c9c1; border-radius: 7px; background: white; min-width: 0; }
+    .graph-rows { display: flex; flex-direction: column; gap: 96px; padding: 24px 36px 64px 24px; position: relative; }
+    .graph-row { display: flex; gap: 32px; }
+    .graph-node { width: 248px; flex: none; padding: 16px; border: 1px solid #c9c9c1; border-radius: 7px; background: white; min-width: 0; }
     .graph-node h2 { font-size: 15px; }
     .graph-node .id { font-size: 12px; }
     .graph-node.missing { border-style: dashed; background: #fafaf9; }
@@ -87,17 +86,15 @@
     {{end}}
     </div>
     <section id="graph-view" hidden aria-label="Experiment lineage">
-      <p class="graph-help">Parent → child · dependency columns, not time. Dashed cards are missing references; dashed arrows stay within a cycle. Focus or hover a card to highlight its immediate connections.</p>
       {{if .Experiments}}
-      <p class="graph-help graph-overflow" hidden>← Scroll horizontally to follow the lineage →</p>
       <div class="graph-scroll" tabindex="0" role="region" aria-label="Scrollable experiment lineage">
         <div class="graph-canvas">
           <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker></defs>
           {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
-          <div class="graph-columns">
-          {{range $rank, $column := .Graph.Columns}}<div class="graph-column">
-            {{range $column}}<article class="graph-node{{if .Missing}} missing{{end}}" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}">
-              <h2>{{.Title}}</h2><code class="id">{{.ID}}</code>
+          <div class="graph-rows">
+          {{range $rank, $row := .Graph.Rows}}<div class="graph-row">
+            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
+              <h2 id="graph-title-{{.Index}}">{{.Title}}</h2><code class="id" id="graph-id-{{.Index}}">{{.ID}}</code>
               {{if .Missing}}<p class="parents">Referenced in based_on; absent from this catalog.</p>{{else}}
               <p class="parents">{{if .Parents}}Based on: {{range $i, $parent := .Parents}}{{if $i}}, {{end}}<code>{{$parent}}</code>{{end}}{{else}}No parents recorded{{end}}</p>
               {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}{{end}}
@@ -115,33 +112,34 @@
     function drawGraph() {
       if (graph.hidden || !graph.querySelector('.graph-canvas')) return;
       const canvas = graph.querySelector('.graph-canvas');
-      const columns = graph.querySelector('.graph-columns');
+      const rows = graph.querySelector('.graph-rows');
       const paths = [...graph.querySelectorAll('path[data-from]')];
       const nodes = [...graph.querySelectorAll('[data-node]')];
       const byID = new Map(nodes.map(node => [node.dataset.node, node]));
       const longEdges = paths.filter(path => +byID.get(path.dataset.to).dataset.rank > +byID.get(path.dataset.from).dataset.rank + 1);
-      columns.style.paddingTop = `${36 + longEdges.length * 14}px`;
-      graph.querySelector('.graph-overflow').hidden = canvas.offsetWidth <= graph.querySelector('.graph-scroll').clientWidth;
+      rows.style.paddingRight = `${36 + longEdges.length * 14}px`;
       const origin = canvas.getBoundingClientRect();
       const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
+      const right = Math.max(...nodes.map(node => { const r = box(node); return r.x + r.w; }));
       let lane = 0;
       paths.forEach(path => {
         const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
         const a = box(from), b = box(to);
-        const x = a.x+a.w, y = a.y+a.h/2, ty = b.y+b.h/2;
-        const sameColumn = from.dataset.rank === to.dataset.rank;
-        path.classList.toggle('cycle', sameColumn);
+        const x = a.x+a.w/2, y = a.y+a.h, tx = b.x+b.w/2;
+        const sameRow = from.dataset.rank === to.dataset.rank;
+        path.classList.toggle('cycle', sameRow);
         let d;
         if (from === to) {
-          d = `M ${x} ${y-10} C ${x+42} ${y-42}, ${x+42} ${y+42}, ${x} ${y+10}`;
-        } else if (sameColumn) {
-          const gutter = x + (a.y < b.y ? 24 : 44);
-          d = `M ${x} ${y} H ${gutter} V ${ty} H ${b.x+b.w}`;
+          d = `M ${x-10} ${y} C ${x-42} ${y+42}, ${x+42} ${y+42}, ${x+10} ${y}`;
+        } else if (sameRow) {
+          const gutter = y + (a.x < b.x ? 24 : 44);
+          d = `M ${x} ${y} V ${gutter} H ${tx} V ${b.y+b.h}`;
         } else if (+to.dataset.rank > +from.dataset.rank + 1) {
-          const top = 18 + lane++ * 14;
-          d = `M ${x} ${y} H ${x+58} V ${top} H ${b.x-20} V ${ty} H ${b.x}`;
+          const side = right + 18 + lane++ * 14;
+          d = `M ${x} ${y} V ${y+60} H ${side} V ${b.y-20} H ${tx} V ${b.y}`;
         } else {
-          d = `M ${x} ${y} C ${x+44} ${y}, ${b.x-44} ${ty}, ${b.x} ${ty}`;
+          const mid = (y + b.y) / 2;
+          d = `M ${x} ${y} C ${x} ${mid}, ${tx} ${mid}, ${tx} ${b.y}`;
         }
         path.setAttribute('d', d);
       });

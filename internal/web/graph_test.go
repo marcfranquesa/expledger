@@ -29,8 +29,8 @@ func TestLineage(t *testing.T) {
 	ranks := map[string]int{}
 	byIndex := map[int]string{}
 	missing := 0
-	for rank, column := range g.Columns {
-		for _, n := range column {
+	for rank, row := range g.Rows {
+		for _, n := range row {
 			if _, ok := ranks[n.ID]; ok {
 				t.Fatalf("duplicate node %s", n.ID)
 			}
@@ -75,11 +75,11 @@ func TestLineage(t *testing.T) {
 }
 
 func TestLineageEmptyAndSingle(t *testing.T) {
-	if g := lineage(nil, nil); len(g.Columns) != 0 || len(g.Edges) != 0 {
+	if g := lineage(nil, nil); len(g.Rows) != 0 || len(g.Edges) != 0 {
 		t.Fatal(g)
 	}
 	g := lineage([]experiment.Record{{ID: "only"}}, []experimentView{{ID: "only"}})
-	if len(g.Columns) != 1 || len(g.Columns[0]) != 1 || len(g.Edges) != 0 {
+	if len(g.Rows) != 1 || len(g.Rows[0]) != 1 || len(g.Edges) != 0 {
 		t.Fatal(g)
 	}
 }
@@ -88,10 +88,10 @@ func TestLineageLongestParentPath(t *testing.T) {
 	records := []experiment.Record{{ID: "root"}, {ID: "mid", BasedOn: []string{"root"}}, {ID: "leaf", BasedOn: []string{"root", "mid", "root"}}}
 	views := []experimentView{{ID: "root"}, {ID: "mid"}, {ID: "leaf", Title: "Leaf title", RemoteURL: "https://example.com/leaf"}}
 	g := lineage(records, views)
-	if len(g.Columns) != 3 || len(g.Columns[2]) != 1 {
-		t.Fatalf("columns: %+v", g.Columns)
+	if len(g.Rows) != 3 || len(g.Rows[2]) != 1 {
+		t.Fatalf("rows: %+v", g.Rows)
 	}
-	leaf := g.Columns[2][0]
+	leaf := g.Rows[2][0]
 	if leaf.ID != "leaf" || leaf.Title != "Leaf title" || leaf.RemoteURL != "https://example.com/leaf" || !reflect.DeepEqual(leaf.Parents, []string{"mid", "root"}) || len(g.Edges) != 3 {
 		t.Fatalf("leaf: %+v, edges: %v", leaf, g.Edges)
 	}

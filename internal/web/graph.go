@@ -15,12 +15,12 @@ type graphNode struct {
 
 type graphEdge struct{ From, To int }
 type graphView struct {
-	Columns [][]graphNode
-	Edges   []graphEdge
+	Rows  [][]graphNode
+	Edges []graphEdge
 }
 
-// Condense strongly connected components before assigning dependency columns.
-// Cycles stay together; columns express lineage, never time.
+// Condense strongly connected components before assigning dependency rows.
+// Cycles stay together; rows express lineage, never time.
 func lineage(records []experiment.Record, views []experimentView) graphView {
 	nodes := map[string]graphNode{}
 	for i, r := range records {
@@ -125,10 +125,10 @@ func lineage(records []experiment.Record, views []experimentView) graphView {
 	}
 	for v, id := range ids {
 		rank := ranks[component[v]]
-		for len(graph.Columns) <= rank {
-			graph.Columns = append(graph.Columns, nil)
+		for len(graph.Rows) <= rank {
+			graph.Rows = append(graph.Rows, nil)
 		}
-		graph.Columns[rank] = append(graph.Columns[rank], nodes[id])
+		graph.Rows[rank] = append(graph.Rows[rank], nodes[id])
 	}
 	return graph
 }

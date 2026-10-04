@@ -105,3 +105,24 @@ func TestGraphEscapingAndReferences(t *testing.T) {
 		t.Fatal("missing known or reference node")
 	}
 }
+
+func TestGraphVerticalMarkup(t *testing.T) {
+	body, err := web.Render([]experiment.Record{{ID: "root", Title: "Root"}, {ID: "child", Title: "Child", BasedOn: []string{"root"}}}, web.PageOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	for _, unwanted := range []string{"graph-help", "graph-overflow", "Scroll horizontally", "dependency columns", "max-height: 75vh"} {
+		if strings.Contains(page, unwanted) {
+			t.Errorf("obsolete graph helper or scrolling constraint: %s", unwanted)
+		}
+	}
+	if strings.Count(page, `class="graph-row"`) != 2 {
+		t.Fatal("expected two dependency rows")
+	}
+	for _, want := range []string{`aria-labelledby="graph-title-0 graph-id-0"`, `id="graph-title-0"`, `id="graph-id-0"`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("missing accessible node label: %s", want)
+		}
+	}
+}
