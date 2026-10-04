@@ -62,8 +62,8 @@
     .graph-node.highlighted { background: #242424; color: #fff; border-color: #242424; }
     .graph-edges path.related { stroke: #242424; stroke-width: 3; vector-effect: non-scaling-stroke; marker-end: url(#arrow-highlight); }
     .graph-edges .cycle { stroke-dasharray: 5 3; }
-    .graph-canvas.highlighting .graph-node:not(.related) { opacity: .18; }
-    .graph-canvas.highlighting path[data-from]:not(.related) { opacity: .06; }
+    .graph-canvas.highlighting .graph-node:not(.related) { opacity: .4; }
+    .graph-canvas.highlighting path[data-from]:not(.related) { opacity: .15; }
     @media (max-width: 800px) {
       .graph-workspace { grid-template-columns: minmax(0, 1fr); }
       .graph-details { border-left: 0; border-top: 1px solid #dcdcd6; max-height: 260px; }
@@ -346,12 +346,13 @@
     }
     nodes.forEach(node => {
       node.title = node.querySelector('h2').textContent + '\n' + node.querySelector('.id').textContent;
-      node.addEventListener('dblclick', () => { fitting = false; setZoom(1, node); });
-      node.addEventListener('click', () => selectNode(node));
+      node.addEventListener('dblclick', () => { selectNode(node); fitting = false; setZoom(1, node); });
+      node.addEventListener('click', () => selectNode(selected === node ? null : node));
       node.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(node, true); }
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(selected === node ? null : node, true); }
       });
-      node.addEventListener('focus', () => { if (selected !== node) selectNode(node); });
+      node.addEventListener('focus', () => highlight(node));
+      node.addEventListener('blur', () => highlight(selected));
       node.addEventListener('mouseenter', () => highlight(node));
       node.addEventListener('mouseleave', () => highlight(selected));
     });
@@ -366,10 +367,14 @@
       if (fitting) drawGraph();
       else setZoom(button.dataset.zoom === 'actual' ? 1 : zoom * (button.dataset.zoom === 'in' ? 1.4 : 1 / 1.4), selected);
     }));
-    let drag = null;
+    let drag = null, dragged = false;
     if (scroll) {
       scroll.addEventListener('scroll', () => { if (scroll.scrollTop || scroll.scrollLeft) fitting = false; });
+      scroll.addEventListener('click', event => {
+        if (!dragged && !event.target.closest('[data-node]')) selectNode(null);
+      });
       scroll.addEventListener('pointerdown', event => {
+        dragged = false;
         if (event.button !== 0 || event.pointerType !== 'mouse' || event.target.closest('[data-node]')) return;
         const bounds = scroll.getBoundingClientRect();
         if (event.clientX - bounds.left >= scroll.clientWidth || event.clientY - bounds.top >= scroll.clientHeight) return;
@@ -379,6 +384,7 @@
       });
       scroll.addEventListener('pointermove', event => {
         if (!drag) return;
+        if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 4) dragged = true;
         scroll.scrollLeft = drag.left + drag.x - event.clientX;
         scroll.scrollTop = drag.top + drag.y - event.clientY;
       });

@@ -73,7 +73,8 @@ Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
 The list remains the default. The graph uses the window width and compact,
 two-line titles. Select an experiment for its full title, ID, timestamp, remote
 link, and clickable parents and children. Search titles or IDs to jump to a
-record. Hover previews direct connections; selection stays highlighted.
+record. Hover previews direct connections; clicking pins the highlight. Click the selected node again or empty graph space
+to clear it. Keyboard focus previews a node without pinning it.
 
 Disconnected lineages are packed alongside each other. Dependency levels run
 top to bottom; wide levels wrap into several rows. Layout is deterministic by ID
