@@ -1,3 +1,8 @@
+---
+title: Versions and releases
+weight: 60
+---
+
 # Versions and releases
 
 **v0.1.0 is the planned first release, not an existing published release.**

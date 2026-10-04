@@ -1,3 +1,8 @@
+---
+title: Installation
+weight: 15
+---
+
 # Installation
 
 The planned first release is **v0.1.0**. It has not been published yet; the
