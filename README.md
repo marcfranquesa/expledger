@@ -70,22 +70,25 @@ they are not current run provenance.
 ## Experiment graph
 
 Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
-The list remains the default. Parent-to-child arrows run through dependency
-rows from top to bottom, with titles and IDs fully wrapped. Focus or hover a card
-to highlight its immediate connections; remote links behave as they do in the list.
+The list remains the default. The graph uses the window width and compact,
+two-line titles. Select an experiment for its full title, ID, timestamp, remote
+link, and clickable parents and children. Search titles or IDs to jump to a
+record. Hover previews direct connections; selection stays highlighted.
 
-The layout is deterministic by ID, independent of timestamps. Multiple parents
-are supported and repeated references produce one edge. Missing parents appear
-as dashed reference cards. Cycles (including self-references) remain visible in
-one row with dashed arrows; the display does not reject or rewrite metadata.
-Independent experiments remain visible as roots. Every card includes parent IDs
-as a text alternative to the arrows.
+Disconnected lineages are packed alongside each other. Dependency levels run
+top to bottom; wide levels wrap into several rows. Layout is deterministic by ID
+at a given viewport size, independent of timestamps. Repeated references produce
+one edge. Missing parents use dashed cards; cycles and self-references use dashed
+arrows. The display does not reject or rewrite metadata.
 
-The page is self-contained and works offline. Graph switching and edge placement
-use embedded JavaScript; without JavaScript the list remains usable. Lineage uses
-natural page scrolling vertically at readable text size; unusually broad rows
-can also scroll horizontally. Dense graphs can still have crossing edges; highlighting helps trace direct connections. There is no
-zoom, filtering, or report panel in this first version.
+Scroll or drag the graph background to pan. Zoom controls and **Fit all** provide
+an overview; the initial view keeps text readable instead of shrinking the entire
+catalog to fit. Double-click a node to center it at 100%. Enter or Space selects and centers a
+focused node at readable zoom. Escape clears selection. Full parent IDs in the details
+panel provide a text alternative to arrows, which may overlap in dense graphs.
+
+The page is self-contained and works offline. Graph controls and edge placement
+use embedded JavaScript; without JavaScript the list remains usable.
 
 Inspired by [Lab Exp's experiment graph](https://github.com/rsoatto/lab-exp),
 with an independent implementation using ExpLedger's metadata and renderer.

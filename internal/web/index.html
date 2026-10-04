@@ -28,21 +28,45 @@
     .view-controls button { font: inherit; font-size: 13px; padding: 8px 16px; border: 1px solid #d4d4ce; border-radius: 6px; background: white; color: #33332e; cursor: pointer; }
     .view-controls button[aria-pressed="true"] { background: #33332e; color: white; border-color: #33332e; }
     :focus-visible { outline: 2px solid #33332e; outline-offset: 4px; }
-    .graph-scroll { margin-top: 24px; overflow-x: auto; border: 1px solid #dcdcd6; border-radius: 8px; background: #f5f5f2; }
-    .graph-canvas { position: relative; width: max-content; min-width: 100%; }
-    .graph-rows { display: flex; flex-direction: column; gap: 96px; padding: 24px 36px 64px 24px; position: relative; }
-    .graph-row { display: flex; gap: 32px; }
-    .graph-node { width: 248px; flex: none; padding: 16px; border: 1px solid #c9c9c1; border-radius: 7px; background: white; min-width: 0; }
-    .graph-node h2 { font-size: 15px; }
-    .graph-node .id { font-size: 12px; }
+    body.graph-active main { max-width: none; padding-top: 24px; padding-bottom: 16px; }
+    body.graph-active .brand { margin-bottom: 16px; }
+    body.graph-active h1 { font-size: 28px; }
+    body.graph-active .context { margin-top: 8px; }
+    body.graph-active .view-controls { margin-top: 16px; }
+    .graph-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 20px 0 10px; }
+    .graph-toolbar button, .graph-toolbar input { font: inherit; font-size: 13px; border: 1px solid #d4d4ce; border-radius: 5px; background: white; padding: 7px 10px; color: inherit; }
+    .graph-toolbar button { cursor: pointer; }
+    .graph-toolbar input { width: 240px; max-width: 100%; margin-right: auto; }
+    .zoom-level { min-width: 42px; text-align: center; font-size: 12px; color: #60605a; }
+    .graph-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; border: 1px solid #dcdcd6; border-radius: 8px; overflow: hidden; }
+    .graph-scroll { cursor: grab; height: max(320px, calc(100dvh - 250px)); overflow: auto; background: #f5f5f2; }
+    .graph-stage { position: relative; overflow: hidden; }
+    .graph-canvas { position: absolute; top: 0; left: 0; transform-origin: top left; }
+    .graph-rows { position: relative; }
+    .graph-component { width: max-content; position: absolute; display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 0 24px 36px 0; }
+    .graph-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 32px 16px; max-width: 904px; }
+    .graph-node { width: 168px; height: 48px; flex: none; padding: 8px 10px; border: 1px solid #c9c9c1; border-radius: 5px; background: white; min-width: 0; cursor: pointer; }
+    .graph-node h2 { font-size: 13px; line-height: 15px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .graph-node.missing { border-style: dashed; background: #fafaf9; }
-    .graph-node .remote-link { margin-top: 12px; padding: 6px 9px; font-size: 12px; }
-    .parents { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: #60605a; overflow-wrap: anywhere; }
+    .graph-node[aria-pressed="true"] { border: 2px solid #33332e; padding: 7px 9px; background: #eeeee8; }
+    .graph-details { padding: 18px; border-left: 1px solid #dcdcd6; background: white; overflow: auto; max-height: max(320px, calc(100dvh - 250px)); font-size: 13px; }
+    .graph-details h2 { font-size: 16px; }
+    .graph-details h3 { margin: 20px 0 6px; font-size: 12px; color: #60605a; }
+    .graph-details p { color: #60605a; line-height: 1.5; }
+    .graph-details .remote-link { margin-top: 16px; }
+    .graph-details button { display: block; width: 100%; text-align: left; font: inherit; padding: 8px 0; border: 0; border-bottom: 1px solid #e4e4df; background: transparent; color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+    .graph-details .id { font-size: 11px; }
     .graph-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-    .graph-edges path { fill: none; stroke: #73736a; stroke-width: 1.5; }
+    .graph-edges path { fill: none; stroke: #73736a; stroke-width: 1.2; }
     .graph-node.related { border-color: #33332e; }
-    .graph-edges path.related { stroke-width: 2; }
+    .graph-edges path.related { stroke: #33332e; stroke-width: 2; }
     .graph-edges .cycle { stroke-dasharray: 5 3; }
+    .graph-canvas.highlighting .graph-node:not(.related) { opacity: .3; }
+    .graph-canvas.highlighting path[data-from]:not(.related) { opacity: .12; }
+    @media (max-width: 800px) {
+      .graph-workspace { grid-template-columns: minmax(0, 1fr); }
+      .graph-details { border-left: 0; border-top: 1px solid #dcdcd6; max-height: 260px; }
+    }
     .empty { padding: 44px 0; }
     .empty p { color: #60605a; line-height: 1.7; }
     @media (max-width: 600px) {
@@ -87,21 +111,35 @@
     </div>
     <section id="graph-view" hidden aria-label="Experiment lineage">
       {{if .Experiments}}
-      <div class="graph-scroll" tabindex="0" role="region" aria-label="Horizontal graph scrolling">
+      <div class="graph-toolbar" role="group" aria-label="Graph controls">
+        <input type="search" aria-label="Find experiment" placeholder="Find experiment…">
+        <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+        <output class="zoom-level" aria-label="Zoom level">100%</output>
+        <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="fit">Fit all</button>
+        <button type="button" data-zoom="actual">100%</button>
+      </div>
+      <div class="graph-workspace">
+      <div class="graph-scroll" tabindex="0" role="region" aria-label="Experiment graph">
+        <div class="graph-stage">
         <div class="graph-canvas">
           <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker></defs>
           {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
           <div class="graph-rows">
           {{range $rank, $row := .Graph.Rows}}<div class="graph-row">
-            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
-              <h2 id="graph-title-{{.Index}}">{{.Title}}</h2><code class="id" id="graph-id-{{.Index}}">{{.ID}}</code>
+            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" role="button" aria-pressed="false" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
+              <h2 id="graph-title-{{.Index}}">{{.Title}}</h2><div class="node-details" hidden><code class="id" id="graph-id-{{.Index}}">{{.ID}}</code>
+              {{if not .Missing}}<time datetime="{{.DateTime}}">{{.CreatedAt}}</time>{{end}}
               {{if .Missing}}<p class="parents">Referenced in based_on; absent from this catalog.</p>{{else}}
               <p class="parents">{{if .Parents}}Based on: {{range $i, $parent := .Parents}}{{if $i}}, {{end}}<code>{{$parent}}</code>{{end}}{{else}}No parents recorded{{end}}</p>
               {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}{{end}}
-            </article>{{end}}
+            </div></article>{{end}}
           </div>{{end}}
           </div>
         </div>
+      </div>
+        </div>
+      <aside class="graph-details" aria-label="Experiment details"><p>Select an experiment</p></aside>
       </div>
       {{else}}<section class="empty"><h2>No experiments yet</h2><p>Create your first record with <code>expledger new my-idea</code>.</p></section>{{end}}
     </section>
@@ -109,66 +147,257 @@
   <script type="text/javascript">
     const controls = document.querySelector('.view-controls');
     const graph = document.getElementById('graph-view');
-    function drawGraph() {
-      if (graph.hidden || !graph.querySelector('.graph-canvas')) return;
-      const canvas = graph.querySelector('.graph-canvas');
-      const rows = graph.querySelector('.graph-rows');
-      const paths = [...graph.querySelectorAll('path[data-from]')];
-      const nodes = [...graph.querySelectorAll('[data-node]')];
-      const byID = new Map(nodes.map(node => [node.dataset.node, node]));
-      const longEdges = paths.filter(path => +byID.get(path.dataset.to).dataset.rank > +byID.get(path.dataset.from).dataset.rank + 1);
-      rows.style.paddingRight = `${36 + longEdges.length * 14}px`;
-      const scroll = graph.querySelector('.graph-scroll');
-      scroll.tabIndex = scroll.scrollWidth > scroll.clientWidth ? 0 : -1;
-      const cycleCounts = new Map(), cycleLanes = new Map();
-      paths.forEach(path => {
-        const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
-        if (from !== to && from.dataset.rank === to.dataset.rank) {
-          cycleCounts.set(from.dataset.rank, (cycleCounts.get(from.dataset.rank) || 0) + 1);
-        }
+    const canvas = graph.querySelector('.graph-canvas');
+    const rows = graph.querySelector('.graph-rows');
+    const scroll = graph.querySelector('.graph-scroll');
+    const stage = graph.querySelector('.graph-stage');
+    const details = graph.querySelector('.graph-details');
+    const nodes = [...graph.querySelectorAll('[data-node]')];
+    const paths = [...graph.querySelectorAll('path[data-from]')];
+    const byID = new Map(nodes.map(node => [node.dataset.node, node]));
+    let selected = null, zoom = 1, fitting = true, overview = false;
+    // Separate disconnected lineages so unrelated roots do not widen every rank.
+    const neighbors = new Map(nodes.map(node => [node, []]));
+    const parents = new Map(nodes.map(node => [node, []]));
+    paths.forEach(path => {
+      const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
+      parents.get(to).push(from);
+      neighbors.get(from).push(to);
+      neighbors.get(to).push(from);
+    });
+    const visited = new Set(), components = [];
+    nodes.forEach(node => {
+      if (visited.has(node)) return;
+      const members = [], pending = [node];
+      visited.add(node);
+      while (pending.length) {
+        const next = pending.pop();
+        members.push(next);
+        neighbors.get(next).forEach(neighbor => {
+          if (!visited.has(neighbor)) { visited.add(neighbor); pending.push(neighbor); }
+        });
+      }
+      components.push(members);
+    });
+    const isolated = components.filter(members => members.length === 1 && neighbors.get(members[0]).length === 0).flat();
+    for (let i = components.length - 1; i >= 0; i--) {
+      if (components[i].length === 1 && neighbors.get(components[i][0]).length === 0) components.splice(i, 1);
+    }
+    components.sort((a, b) => b.length - a.length);
+    if (isolated.length) components.push(isolated);
+    if (rows) {
+      rows.replaceChildren();
+      components.forEach(members => {
+        const component = document.createElement('div');
+        component.className = 'graph-component';
+        const ranks = new Map();
+        members.sort((a, b) => +a.dataset.node - +b.dataset.node).forEach(node => {
+          const rank = +node.dataset.rank;
+          if (!ranks.has(rank)) ranks.set(rank, []);
+          ranks.get(rank).push(node);
+        });
+        const positions = new Map();
+        const parentPosition = node => {
+          const known = parents.get(node).filter(parent => positions.has(parent));
+          return known.length ? known.reduce((sum, parent) => sum + positions.get(parent), 0) / known.length : Infinity;
+        };
+        [...ranks].sort((a, b) => a[0] - b[0]).forEach(([, members]) => {
+          members.sort((a, b) => parentPosition(a) - parentPosition(b));
+          members.forEach((node, index) => positions.set(node, index));
+          const row = document.createElement('div');
+          row.className = 'graph-row';
+          row.append(...members);
+          component.append(row);
+        });
+        rows.append(component);
       });
+    }
+    function setZoom(value, centerNode) {
+      if (!canvas) return;
+      const old = zoom;
+      const cx = (scroll.scrollLeft + scroll.clientWidth / 2) / old;
+      const cy = (scroll.scrollTop + scroll.clientHeight / 2) / old;
+      zoom = Math.max(.02, Math.min(2, value));
+      canvas.style.transform = `scale(${zoom})`;
+      canvas.style.left = `${Math.max(0, (scroll.clientWidth - canvas.offsetWidth * zoom) / 2)}px`;
+      stage.style.width = `${Math.max(scroll.clientWidth, canvas.offsetWidth * zoom)}px`;
+      stage.style.height = `${Math.max(scroll.clientHeight, canvas.offsetHeight * zoom)}px`;
+      graph.querySelector('.zoom-level').textContent = `${Math.round(zoom * 100)}%`;
+      if (centerNode) {
+        const r = centerNode.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+        scroll.scrollLeft = r.left - c.left + r.width / 2 - scroll.clientWidth / 2;
+        scroll.scrollTop = r.top - c.top + r.height / 2 - scroll.clientHeight / 2;
+      } else {
+        scroll.scrollLeft = cx * zoom - scroll.clientWidth / 2;
+        scroll.scrollTop = cy * zoom - scroll.clientHeight / 2;
+      }
+    }
+    function fitGraph() {
+      const fit = Math.min(1, scroll.clientWidth / canvas.offsetWidth, scroll.clientHeight / canvas.offsetHeight);
+      setZoom(overview ? fit : Math.max(.75, fit));
+      scroll.scrollLeft = 0;
+      scroll.scrollTop = 0;
+    }
+    function drawGraph() {
+      if (graph.hidden || !canvas) return;
+      canvas.style.transform = 'none';
+      const groups = [...rows.children];
+      const perRow = Math.max(2, Math.min(5, Math.floor((scroll.clientWidth / .75 - 112) / 184)));
+      graph.querySelectorAll('.graph-row').forEach(row => { row.style.width = `${Math.min(perRow, row.children.length) * 184 - 16}px`; });
+      groups.forEach(group => { group.style.paddingRight = '64px'; });
+      const columnWidth = Math.max(...groups.map(group => group.offsetWidth));
+      const totalHeight = groups.reduce((sum, group) => sum + group.offsetHeight + 32, 0);
+      const targetColumns = overview
+        ? Math.ceil(Math.sqrt(totalHeight / (columnWidth + 32) * scroll.clientWidth / scroll.clientHeight))
+        : Math.floor((scroll.clientWidth / .75 - 16) / (columnWidth + 32));
+      const columns = Math.min(groups.length, Math.max(1, targetColumns));
+      const bottoms = Array(columns).fill(24);
+      groups.forEach(group => {
+        const column = bottoms.indexOf(Math.min(...bottoms));
+        group.style.left = `${24 + column * (columnWidth + 32)}px`;
+        group.style.top = `${bottoms[column]}px`;
+        bottoms[column] += group.offsetHeight + 32;
+      });
+      rows.style.width = `${columns * (columnWidth + 32) + 16}px`;
+      rows.style.height = `${Math.max(...bottoms)}px`;
       const origin = canvas.getBoundingClientRect();
       const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
-      const right = Math.max(...nodes.map(node => { const r = box(node); return r.x + r.w; }));
-      let lane = 0;
+      const boxes = new Map(nodes.map(node => [node, box(node)]));
+      const lanes = new Map();
+      const rowGap = parseFloat(getComputedStyle(graph.querySelector('.graph-row')).rowGap);
       paths.forEach(path => {
         const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
-        const a = box(from), b = box(to);
+        const a = boxes.get(from), b = boxes.get(to), group = from.closest('.graph-component');
         const x = a.x+a.w/2, y = a.y+a.h, tx = b.x+b.w/2;
         const sameRow = from.dataset.rank === to.dataset.rank;
         path.classList.toggle('cycle', sameRow);
+        const lane = lanes.get(group) || 0;
         let d;
         if (from === to) {
-          d = `M ${x-10} ${y} C ${x-42} ${y+42}, ${x+42} ${y+42}, ${x+10} ${y}`;
-        } else if (sameRow) {
-          const rank = from.dataset.rank, lane = cycleLanes.get(rank) || 0;
-          cycleLanes.set(rank, lane + 1);
-          const gutter = y + 24 + 20 * lane / Math.max(1, cycleCounts.get(rank) - 1);
-          d = `M ${x-8} ${y} V ${gutter} H ${tx+8} V ${b.y+b.h}`;
-        } else if (+to.dataset.rank > +from.dataset.rank + 1) {
-          const side = right + 18 + lane++ * 14;
-          d = `M ${x} ${y} V ${y+60} H ${side} V ${b.y-20} H ${tx} V ${b.y}`;
+          d = `M ${x-8} ${y} C ${x-30} ${y+32}, ${x+30} ${y+32}, ${x+8} ${y}`;
+        } else if (sameRow && a.y === b.y) {
+          const gutter = y + 10 + (lane % 3) * 5;
+          lanes.set(group, lane + 1);
+          d = `M ${x-6} ${y} V ${gutter} H ${tx+6} V ${b.y+b.h}`;
+        } else if (sameRow || +to.dataset.rank > +from.dataset.rank + 1 || b.y - y > rowGap + 1) {
+          const right = Math.max(...[...group.querySelectorAll('[data-node]')].map(node => { const r = boxes.get(node); return r.x+r.w; }));
+          const side = right + 12 + (lane % 6) * 8;
+          lanes.set(group, lane + 1);
+          const end = sameRow ? b.y + b.h : b.y;
+          const gutter = sameRow ? end + 16 : end - 12;
+          d = `M ${x} ${y} V ${y+16} H ${side} V ${gutter} H ${tx} V ${end}`;
         } else {
           const mid = (y + b.y) / 2;
           d = `M ${x} ${y} C ${x} ${mid}, ${tx} ${mid}, ${tx} ${b.y}`;
         }
         path.setAttribute('d', d);
       });
+      if (fitting) fitGraph(); else setZoom(zoom);
     }
     function highlight(node) {
+      if (!canvas) return;
+      canvas.classList.toggle('highlighting', !!node);
       const related = new Set(node ? [node.dataset.node] : []);
-      graph.querySelectorAll('path[data-from]').forEach(path => {
+      paths.forEach(path => {
         const incident = node && (path.dataset.from === node.dataset.node || path.dataset.to === node.dataset.node);
         path.classList.toggle('related', !!incident);
         if (incident) { related.add(path.dataset.from); related.add(path.dataset.to); }
       });
-      graph.querySelectorAll('[data-node]').forEach(card => card.classList.toggle('related', related.has(card.dataset.node)));
+      nodes.forEach(card => card.classList.toggle('related', related.has(card.dataset.node)));
     }
-    graph.addEventListener('focusin', event => highlight(event.target.closest('[data-node]')));
-    graph.addEventListener('focusout', event => highlight(event.relatedTarget && event.relatedTarget.closest('[data-node]')));
-    graph.querySelectorAll('[data-node]').forEach(node => {
+    function selectNode(node, center = false) {
+      selected = node;
+      nodes.forEach(card => card.setAttribute('aria-pressed', card === node));
+      details.replaceChildren();
+      if (node) {
+        const title = document.createElement('h2');
+        title.textContent = node.querySelector('h2').textContent;
+        const metadata = node.querySelector('.node-details').cloneNode(true);
+        metadata.hidden = false;
+        metadata.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+        details.append(title, metadata);
+        for (const [label, end, other] of [['Parents', 'to', 'from'], ['Children', 'from', 'to']]) {
+          const links = paths.filter(path => path.dataset[end] === node.dataset.node);
+          if (!links.length) continue;
+          const heading = document.createElement('h3');
+          heading.textContent = `${label} · ${links.length}`;
+          details.append(heading);
+          links.forEach(path => {
+            const target = byID.get(path.dataset[other]);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = target.querySelector('h2').textContent;
+            button.title = target.querySelector('.id').textContent;
+            button.addEventListener('click', () => { selectNode(target, true); target.focus({preventScroll: true}); });
+            details.append(button);
+          });
+        }
+        if (center) { fitting = false; setZoom(Math.max(.75, zoom), node); }
+      } else {
+        const p = document.createElement('p');
+        p.textContent = 'Select an experiment';
+        details.append(p);
+      }
+      highlight(node);
+    }
+    nodes.forEach(node => {
+      node.title = node.querySelector('h2').textContent + '\n' + node.querySelector('.id').textContent;
+      node.addEventListener('dblclick', () => { fitting = false; setZoom(1, node); });
+      node.addEventListener('click', () => selectNode(node));
+      node.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(node, true); }
+      });
+      node.addEventListener('focus', () => { if (selected !== node) selectNode(node); });
       node.addEventListener('mouseenter', () => highlight(node));
-      node.addEventListener('mouseleave', () => highlight(document.activeElement.closest('[data-node]')));
+      node.addEventListener('mouseleave', () => highlight(selected));
+    });
+    graph.addEventListener('keydown', event => {
+      if (event.key !== 'Escape' || !details) return;
+      if (event.target.matches('input[type="search"]')) { event.target.value = ''; selectNode(selected); }
+      else selectNode(null);
+    });
+    graph.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
+      fitting = button.dataset.zoom === 'fit';
+      if (fitting) overview = true;
+      if (fitting) drawGraph();
+      else setZoom(button.dataset.zoom === 'actual' ? 1 : zoom * (button.dataset.zoom === 'in' ? 1.4 : 1 / 1.4), selected);
+    }));
+    let drag = null;
+    if (scroll) {
+      scroll.addEventListener('scroll', () => { if (scroll.scrollTop || scroll.scrollLeft) fitting = false; });
+      scroll.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || event.pointerType !== 'mouse' || event.target.closest('[data-node]')) return;
+        const bounds = scroll.getBoundingClientRect();
+        if (event.clientX - bounds.left >= scroll.clientWidth || event.clientY - bounds.top >= scroll.clientHeight) return;
+        drag = {x: event.clientX, y: event.clientY, left: scroll.scrollLeft, top: scroll.scrollTop};
+        scroll.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+      scroll.addEventListener('pointermove', event => {
+        if (!drag) return;
+        scroll.scrollLeft = drag.left + drag.x - event.clientX;
+        scroll.scrollTop = drag.top + drag.y - event.clientY;
+      });
+      scroll.addEventListener('lostpointercapture', () => { drag = null; });
+    }
+    const search = graph.querySelector('input[type="search"]');
+    if (search) search.addEventListener('input', () => {
+      if (!search.value.trim()) { selectNode(selected); return; }
+      details.replaceChildren();
+      const matches = nodes.filter(node => (node.querySelector('h2').textContent + ' ' + node.querySelector('.id').textContent).toLowerCase().includes(search.value.trim().toLowerCase()));
+      highlight(null);
+      canvas.classList.add('highlighting');
+      matches.forEach(node => node.classList.add('related'));
+      const heading = document.createElement('h2');
+      heading.textContent = `${matches.length} experiment${matches.length === 1 ? '' : 's'}`;
+      details.append(heading);
+      matches.forEach(node => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = node.querySelector('h2').textContent;
+        button.addEventListener('click', () => { search.value = ''; selectNode(node, true); node.focus({preventScroll: true}); });
+        details.append(button);
+      });
     });
     controls.hidden = false;
     controls.addEventListener('click', event => {
@@ -179,6 +408,7 @@
         control.setAttribute('aria-pressed', selected);
         document.getElementById(control.dataset.view).hidden = !selected;
       });
+      document.body.classList.toggle('graph-active', !graph.hidden);
       drawGraph();
     });
     new ResizeObserver(drawGraph).observe(graph);
