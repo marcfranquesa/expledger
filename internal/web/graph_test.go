@@ -96,3 +96,29 @@ func TestLineageLongestParentPath(t *testing.T) {
 		t.Fatalf("leaf: %+v, edges: %v", leaf, g.Edges)
 	}
 }
+
+func TestTerminalDescendantsIncludeSinkCycles(t *testing.T) {
+	records := []experiment.Record{
+		{ID: "root"},
+		{ID: "cycle-a", BasedOn: []string{"root", "cycle-b"}},
+		{ID: "cycle-b", BasedOn: []string{"cycle-a"}},
+		{ID: "leaf", BasedOn: []string{"cycle-a"}},
+		{ID: "sink-a", BasedOn: []string{"root", "sink-b"}},
+		{ID: "sink-b", BasedOn: []string{"sink-a"}},
+		{ID: "self", BasedOn: []string{"self"}},
+		{ID: "alone"},
+		{ID: "orphan", BasedOn: []string{"missing"}},
+	}
+	views := make([]experimentView, len(records))
+	for i, record := range records {
+		views[i].ID = record.ID
+	}
+	want := map[string]bool{"leaf": true, "sink-a": true, "sink-b": true, "self": true, "alone": true, "orphan": true}
+	for _, row := range lineage(records, views).Rows {
+		for _, node := range row {
+			if node.Terminal != want[node.ID] {
+				t.Errorf("%s: terminal = %v, want %v", node.ID, node.Terminal, want[node.ID])
+			}
+		}
+	}
+}

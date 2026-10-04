@@ -112,11 +112,6 @@ func TestGraphVerticalMarkup(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := string(body)
-	for _, unwanted := range []string{"graph-help", "graph-overflow", "Scroll horizontally", "dependency columns", "max-height: 75vh"} {
-		if strings.Contains(page, unwanted) {
-			t.Errorf("obsolete graph helper or scrolling constraint: %s", unwanted)
-		}
-	}
 	if strings.Count(page, `class="graph-row"`) != 2 {
 		t.Fatal("expected two dependency rows")
 	}

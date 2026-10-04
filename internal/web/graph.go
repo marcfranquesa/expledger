@@ -8,9 +8,10 @@ import (
 
 type graphNode struct {
 	experimentView
-	Index   int
-	Missing bool
-	Parents []string
+	Index    int
+	Missing  bool
+	Terminal bool
+	Parents  []string
 }
 
 type graphEdge struct{ From, To int }
@@ -110,6 +111,7 @@ func lineage(records []experiment.Record, views []experimentView) graphView {
 	}
 	// Tarjan emits child components first, so reverse order is topological.
 	ranks := make([]int, count)
+	hasDescendants := make([]bool, count)
 	members := make([][]int, count)
 	for v, c := range component {
 		members[c] = append(members[c], v)
@@ -118,6 +120,7 @@ func lineage(records []experiment.Record, views []experimentView) graphView {
 		for _, v := range members[c] {
 			for _, w := range children[v] {
 				if component[w] != c {
+					hasDescendants[c] = true
 					ranks[component[w]] = max(ranks[component[w]], ranks[c]+1)
 				}
 			}
@@ -128,7 +131,9 @@ func lineage(records []experiment.Record, views []experimentView) graphView {
 		for len(graph.Rows) <= rank {
 			graph.Rows = append(graph.Rows, nil)
 		}
-		graph.Rows[rank] = append(graph.Rows[rank], nodes[id])
+		node := nodes[id]
+		node.Terminal = !hasDescendants[component[v]]
+		graph.Rows[rank] = append(graph.Rows[rank], node)
 	}
 	return graph
 }

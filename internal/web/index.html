@@ -43,7 +43,7 @@
     .graph-stage { position: relative; overflow: hidden; }
     .graph-canvas { position: absolute; top: 0; left: 0; transform-origin: top left; }
     .graph-rows { --graph-gap: 32px; position: relative; }
-    .graph-component { width: max-content; position: absolute; display: flex; flex-direction: column; align-items: center; gap: var(--graph-gap); padding: 0 24px 36px 0; }
+    .graph-component { width: max-content; position: absolute; display: flex; flex-direction: column; align-items: center; gap: var(--graph-gap); padding: 0 64px 36px 0; }
     .graph-row { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--graph-gap) 16px; max-width: 904px; }
     .graph-node { width: 168px; height: 48px; flex: none; padding: 8px 10px; border: 1px solid #c9c9c1; border-radius: 5px; background: white; min-width: 0; cursor: pointer; }
     .graph-node h2 { font-size: 13px; line-height: 15px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -117,7 +117,6 @@
         <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
         <output class="zoom-level" aria-label="Zoom level">100%</output>
         <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
-        <button type="button" data-zoom="fit">Fit all</button>
         <button type="button" data-zoom="actual">100%</button>
       </div>
       <div class="graph-workspace">
@@ -128,7 +127,7 @@
           {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
           <div class="graph-rows">
           {{range $rank, $row := .Graph.Rows}}<div class="graph-row">
-            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" role="button" aria-pressed="false" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
+            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" role="button" aria-pressed="false" tabindex="0" data-node="{{.Index}}" data-rank="{{$rank}}" data-terminal="{{.Terminal}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
               <h2 id="graph-title-{{.Index}}">{{.Title}}</h2><div class="node-details" hidden><code class="id" id="graph-id-{{.Index}}">{{.ID}}</code>
               {{if not .Missing}}<time datetime="{{.DateTime}}">{{.CreatedAt}}</time>{{end}}
               {{if .Missing}}<p class="parents">Referenced in based_on; absent from this catalog.</p>{{else}}
@@ -156,7 +155,7 @@
     const nodes = [...graph.querySelectorAll('[data-node]')];
     const paths = [...graph.querySelectorAll('path[data-from]')];
     const byID = new Map(nodes.map(node => [node.dataset.node, node]));
-    let selected = null, zoom = 1, fitting = true, overview = false;
+    let selected = null, zoom = .75;
     // Separate disconnected lineages so unrelated roots do not widen every rank.
     const neighbors = new Map(nodes.map(node => [node, []]));
     const parents = new Map(nodes.map(node => [node, []]));
@@ -180,14 +179,10 @@
       }
       components.push(members);
     });
-    const isolated = components.filter(members => members.length === 1 && neighbors.get(members[0]).length === 0).flat();
-    for (let i = components.length - 1; i >= 0; i--) {
-      if (components[i].length === 1 && neighbors.get(components[i][0]).length === 0) components.splice(i, 1);
-    }
     const created = node => Date.parse(node.querySelector('time')?.dateTime || '') || 0;
     const newestFirst = (a, b) => created(b) - created(a) || +a.dataset.node - +b.dataset.node;
-    if (isolated.length) components.push(isolated);
-    components.sort((a, b) => Math.max(...b.map(created)) - Math.max(...a.map(created)) || +a[0].dataset.node - +b[0].dataset.node);
+    const latestDescendant = members => Math.max(...members.filter(node => node.dataset.terminal === 'true').map(created));
+    components.sort((a, b) => latestDescendant(b) - latestDescendant(a) || +a[0].dataset.node - +b[0].dataset.node);
     if (rows) {
       rows.replaceChildren();
       components.forEach(members => {
@@ -235,24 +230,14 @@
         scroll.scrollTop = cy * zoom - scroll.clientHeight / 2;
       }
     }
-    function fitGraph() {
-      const fit = Math.min(1, scroll.clientWidth / canvas.offsetWidth, scroll.clientHeight / canvas.offsetHeight);
-      setZoom(overview ? fit : Math.max(.75, fit));
-      scroll.scrollLeft = 0;
-      scroll.scrollTop = 0;
-    }
     function drawGraph() {
       if (graph.hidden || !canvas) return;
       canvas.style.transform = 'none';
       const groups = [...rows.children];
       const perRow = Math.max(2, Math.min(5, Math.floor((scroll.clientWidth / .75 - 112) / 184)));
       graph.querySelectorAll('.graph-row').forEach(row => { row.style.width = `${Math.min(perRow, row.children.length) * 184 - 16}px`; });
-      groups.forEach(group => { group.style.paddingRight = '64px'; });
       const columnWidth = Math.max(...groups.map(group => group.offsetWidth));
-      const totalHeight = groups.reduce((sum, group) => sum + group.offsetHeight + 32, 0);
-      const targetColumns = overview
-        ? Math.ceil(Math.sqrt(totalHeight / (columnWidth + 32) * scroll.clientWidth / scroll.clientHeight))
-        : Math.floor((scroll.clientWidth / .75 - 16) / (columnWidth + 32));
+      const targetColumns = Math.floor((scroll.clientWidth / .75 - 16) / (columnWidth + 32));
       const columns = Math.min(groups.length, Math.max(1, targetColumns));
       const bottoms = Array(columns).fill(24);
       groups.forEach(group => {
@@ -295,7 +280,7 @@
         }
         path.setAttribute('d', d);
       });
-      if (fitting) fitGraph(); else setZoom(zoom);
+      setZoom(zoom);
     }
     function highlight(node) {
       if (!canvas) return;
@@ -338,7 +323,7 @@
             details.append(button);
           });
         }
-        if (center) { fitting = false; setZoom(Math.max(.75, zoom), node); }
+        if (center) { setZoom(Math.max(.75, zoom), node); }
       } else {
         const p = document.createElement('p');
         p.textContent = 'Select an experiment';
@@ -348,7 +333,7 @@
     }
     nodes.forEach(node => {
       node.title = node.querySelector('h2').textContent + '\n' + node.querySelector('.id').textContent;
-      node.addEventListener('dblclick', () => { selectNode(node); fitting = false; setZoom(1, node); });
+      node.addEventListener('dblclick', () => { selectNode(node); setZoom(1, node); });
       node.addEventListener('click', () => selectNode(selected === node ? null : node));
       node.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(selected === node ? null : node, true); }
@@ -364,17 +349,13 @@
       else selectNode(null);
     });
     graph.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
-      fitting = button.dataset.zoom === 'fit';
-      if (fitting) overview = true;
-      if (fitting) drawGraph();
-      else setZoom(button.dataset.zoom === 'actual' ? 1 : zoom * (button.dataset.zoom === 'in' ? 1.4 : 1 / 1.4), selected);
+      setZoom(button.dataset.zoom === 'actual' ? 1 : zoom * (button.dataset.zoom === 'in' ? 1.4 : 1 / 1.4), selected);
     }));
     let drag = null, dragged = false;
     if (scroll) {
       scroll.addEventListener('wheel', event => {
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();
-        fitting = false;
         const before = canvas.getBoundingClientRect();
         const x = (event.clientX - before.left) / zoom;
         const y = (event.clientY - before.top) / zoom;
@@ -385,7 +366,6 @@
         scroll.scrollLeft += after.left + x * zoom - event.clientX;
         scroll.scrollTop += after.top + y * zoom - event.clientY;
       }, {passive: false});
-      scroll.addEventListener('scroll', () => { if (scroll.scrollTop || scroll.scrollLeft) fitting = false; });
       scroll.addEventListener('click', event => {
         if (!dragged && !event.target.closest('[data-node]')) selectNode(null);
       });

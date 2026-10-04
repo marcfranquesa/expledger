@@ -69,33 +69,22 @@ they are not current run provenance.
 
 ## Experiment graph
 
-Choose **Graph** in either `build` or `serve` to explore `based_on` lineage. The
-list remains the default. The graph uses the window width and compact, two-line
-titles. Select an experiment for its full title, ID, timestamp, remote link, and
-clickable parents and children. Search titles or IDs to jump to a record. Hover
-previews direct connections; clicking pins the highlight. Click the selected
-node again or empty graph space to clear it. Keyboard focus previews a node
-without pinning it.
+Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
+Descendants appear above ancestors, with arrows pointing upward. Independent
+lineages favor their newest terminal descendant, so a late-imported ancestor
+does not promote an older branch. Cycles are treated as a unit. Wide rows wrap;
+shared routes reduce edge clutter. Missing parents and cycles use dashed styling.
 
-Disconnected lineages are packed alongside each other. Descendants appear above
-their ancestors, with parent-to-child arrows pointing upward; wide levels wrap
-into several rows. Independent groups and siblings favor newer creation
-timestamps, with IDs breaking ties; dependency structure takes precedence over
-date order. Repeated references produce one edge. Missing parents use dashed
-cards; cycles and self-references use dashed arrows. The display does not reject
-or rewrite metadata.
+Hover or focus previews direct connections; clicking pins selection and opens
+full metadata, remote links, and navigable parents/children. Click the selected
+node again, empty space, or Escape to clear it. Search by title or ID. Scroll or
+drag to pan; Ctrl/Command + wheel zooms around the pointer. The graph starts at
+75%; +/− and 100% adjust zoom without switching layouts. Double-click centers a
+node at 100%; Enter or Space selects and centers a focused node.
 
-Scroll or drag the graph background to pan. Hold Ctrl or Command while scrolling
-the mouse wheel to zoom around the pointer. Zoom controls and **Fit all**
-provide an overview; the initial view keeps text readable instead of shrinking
-the entire catalog to fit. Double-click a node to center it at 100%. Enter or
-Space selects and centers a focused node at readable zoom. Escape clears
-selection. Full parent IDs in the details panel provide a text alternative to
-arrows, which share horizontal and vertical routes to reduce clutter. Selection
-highlights the exact parent-to-child paths within those bundles.
-
-The page is self-contained and works offline. Graph controls and edge placement
-use embedded JavaScript; without JavaScript the list remains usable.
+The page is self-contained and works offline. The list remains the default and
+works without JavaScript. Dependency structure takes precedence over date order;
+parent IDs in the details panel provide a text alternative to bundled arrows.
 
 Inspired by [Lab Exp's experiment graph](https://github.com/rsoatto/lab-exp),
 with an independent implementation using ExpLedger's metadata and renderer.
