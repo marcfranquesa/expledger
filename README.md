@@ -85,7 +85,8 @@ date order. Repeated references produce one edge. Missing parents use dashed
 cards; cycles and self-references use dashed arrows. The display does not reject
 or rewrite metadata.
 
-Scroll or drag the graph background to pan. Zoom controls and **Fit all**
+Scroll or drag the graph background to pan. Hold Ctrl or Command while scrolling
+the mouse wheel to zoom around the pointer. Zoom controls and **Fit all**
 provide an overview; the initial view keeps text readable instead of shrinking
 the entire catalog to fit. Double-click a node to center it at 100%. Enter or
 Space selects and centers a focused node at readable zoom. Escape clears

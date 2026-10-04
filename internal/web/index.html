@@ -371,6 +371,20 @@
     }));
     let drag = null, dragged = false;
     if (scroll) {
+      scroll.addEventListener('wheel', event => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        fitting = false;
+        const before = canvas.getBoundingClientRect();
+        const x = (event.clientX - before.left) / zoom;
+        const y = (event.clientY - before.top) / zoom;
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroll.clientHeight : 1;
+        const delta = Math.max(-240, Math.min(240, event.deltaY * unit));
+        setZoom(zoom * Math.exp(-delta * .002));
+        const after = canvas.getBoundingClientRect();
+        scroll.scrollLeft += after.left + x * zoom - event.clientX;
+        scroll.scrollTop += after.top + y * zoom - event.clientY;
+      }, {passive: false});
       scroll.addEventListener('scroll', () => { if (scroll.scrollTop || scroll.scrollLeft) fitting = false; });
       scroll.addEventListener('click', event => {
         if (!dragged && !event.target.closest('[data-node]')) selectNode(null);
