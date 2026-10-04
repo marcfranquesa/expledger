@@ -87,7 +87,7 @@
     </div>
     <section id="graph-view" hidden aria-label="Experiment lineage">
       {{if .Experiments}}
-      <div class="graph-scroll" tabindex="0" role="region" aria-label="Scrollable experiment lineage">
+      <div class="graph-scroll" tabindex="0" role="region" aria-label="Horizontal graph scrolling">
         <div class="graph-canvas">
           <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker></defs>
           {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
@@ -118,6 +118,15 @@
       const byID = new Map(nodes.map(node => [node.dataset.node, node]));
       const longEdges = paths.filter(path => +byID.get(path.dataset.to).dataset.rank > +byID.get(path.dataset.from).dataset.rank + 1);
       rows.style.paddingRight = `${36 + longEdges.length * 14}px`;
+      const scroll = graph.querySelector('.graph-scroll');
+      scroll.tabIndex = scroll.scrollWidth > scroll.clientWidth ? 0 : -1;
+      const cycleCounts = new Map(), cycleLanes = new Map();
+      paths.forEach(path => {
+        const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
+        if (from !== to && from.dataset.rank === to.dataset.rank) {
+          cycleCounts.set(from.dataset.rank, (cycleCounts.get(from.dataset.rank) || 0) + 1);
+        }
+      });
       const origin = canvas.getBoundingClientRect();
       const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
       const right = Math.max(...nodes.map(node => { const r = box(node); return r.x + r.w; }));
@@ -132,8 +141,10 @@
         if (from === to) {
           d = `M ${x-10} ${y} C ${x-42} ${y+42}, ${x+42} ${y+42}, ${x+10} ${y}`;
         } else if (sameRow) {
-          const gutter = y + (a.x < b.x ? 24 : 44);
-          d = `M ${x} ${y} V ${gutter} H ${tx} V ${b.y+b.h}`;
+          const rank = from.dataset.rank, lane = cycleLanes.get(rank) || 0;
+          cycleLanes.set(rank, lane + 1);
+          const gutter = y + 24 + 20 * lane / Math.max(1, cycleCounts.get(rank) - 1);
+          d = `M ${x-8} ${y} V ${gutter} H ${tx+8} V ${b.y+b.h}`;
         } else if (+to.dataset.rank > +from.dataset.rank + 1) {
           const side = right + 18 + lane++ * 14;
           d = `M ${x} ${y} V ${y+60} H ${side} V ${b.y-20} H ${tx} V ${b.y}`;

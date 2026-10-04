@@ -120,7 +120,7 @@ func TestGraphVerticalMarkup(t *testing.T) {
 	if strings.Count(page, `class="graph-row"`) != 2 {
 		t.Fatal("expected two dependency rows")
 	}
-	for _, want := range []string{`aria-labelledby="graph-title-0 graph-id-0"`, `id="graph-title-0"`, `id="graph-id-0"`} {
+	for _, want := range []string{`data-rank="1"`, `aria-labelledby="graph-title-0 graph-id-0"`, `id="graph-title-0"`, `id="graph-id-0"`} {
 		if !strings.Contains(page, want) {
 			t.Errorf("missing accessible node label: %s", want)
 		}
