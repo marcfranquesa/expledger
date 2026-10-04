@@ -58,11 +58,12 @@
     .graph-details .id { font-size: 11px; }
     .graph-edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
     .graph-edges path { fill: none; stroke: #73736a; stroke-width: 1.2; }
-    .graph-node.related { border-color: #33332e; }
-    .graph-edges path.related { stroke: #33332e; stroke-width: 2; }
+    .graph-node.related { border: 2px solid #33332e; padding: 7px 9px; background: #fff; }
+    .graph-node.highlighted { background: #242424; color: #fff; border-color: #242424; }
+    .graph-edges path.related { stroke: #242424; stroke-width: 3; vector-effect: non-scaling-stroke; marker-end: url(#arrow-highlight); }
     .graph-edges .cycle { stroke-dasharray: 5 3; }
-    .graph-canvas.highlighting .graph-node:not(.related) { opacity: .3; }
-    .graph-canvas.highlighting path[data-from]:not(.related) { opacity: .12; }
+    .graph-canvas.highlighting .graph-node:not(.related) { opacity: .18; }
+    .graph-canvas.highlighting path[data-from]:not(.related) { opacity: .06; }
     @media (max-width: 800px) {
       .graph-workspace { grid-template-columns: minmax(0, 1fr); }
       .graph-details { border-left: 0; border-top: 1px solid #dcdcd6; max-height: 260px; }
@@ -123,7 +124,7 @@
       <div class="graph-scroll" tabindex="0" role="region" aria-label="Experiment graph">
         <div class="graph-stage">
         <div class="graph-canvas">
-          <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker></defs>
+          <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker><marker id="arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#242424" /></marker></defs>
           {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
           <div class="graph-rows">
           {{range $rank, $row := .Graph.Rows}}<div class="graph-row">
@@ -301,9 +302,12 @@
       paths.forEach(path => {
         const incident = node && (path.dataset.from === node.dataset.node || path.dataset.to === node.dataset.node);
         path.classList.toggle('related', !!incident);
-        if (incident) { related.add(path.dataset.from); related.add(path.dataset.to); }
+        if (incident) { related.add(path.dataset.from); related.add(path.dataset.to); path.parentNode.append(path); }
       });
-      nodes.forEach(card => card.classList.toggle('related', related.has(card.dataset.node)));
+      nodes.forEach(card => {
+        card.classList.toggle('related', related.has(card.dataset.node));
+        card.classList.toggle('highlighted', card === node);
+      });
     }
     function selectNode(node, center = false) {
       selected = node;
