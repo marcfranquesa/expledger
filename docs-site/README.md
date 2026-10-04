@@ -28,7 +28,15 @@ The documentation module uses the local parent module through `replace`; generat
 and theme dependencies do not enter the CLI's module or installed binary. Use
 `hugo mod get github.com/alex-shpak/hugo-book@<version>` from this directory when
 intentionally updating the theme. Plain `go mod tidy` removes the theme dependency
-because it has no imported Go package; use `hugo mod tidy` for Hugo dependencies.
+because it has no imported Go package. Conversely, `hugo mod tidy` removes the
+Go generator's dependencies. If tidying Hugo dependencies, run this complete
+sequence from `docs-site/` to restore them before the readonly build:
+
+```sh
+hugo mod tidy
+go run -mod=mod ./generate
+../scripts/docs.sh --minify --panicOnWarning
+```
 
 After changing the root module's Go dependencies, run `go run -mod=mod ./generate`
 from `docs-site/` to refresh the generator's module requirements and checksums,
