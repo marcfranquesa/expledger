@@ -31,6 +31,7 @@ func generate() error {
 		return err
 	}
 	root := cli.NewCommand("", time.Time{})
+	root.InitDefaultVersionFlag()
 	root.DisableAutoGenTag = true
 	if err := doc.GenMarkdownTreeCustom(root, output, func(path string) string {
 		name := strings.ReplaceAll(strings.TrimSuffix(filepath.Base(path), ".md"), "_", " ")
