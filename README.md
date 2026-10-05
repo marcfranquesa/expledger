@@ -30,7 +30,7 @@ ExpLedger is in active development. Expect breaking changes.
 | `expledger list` | List experiment IDs and titles, newest first. |
 | `expledger validate <id>` | Validate an experiment's `experiment.yaml` and check that its ID matches the folder name. |
 | `expledger build [--output <directory>]` | Generate a static snapshot in `dist/index.html` by default. |
-| `expledger serve [--port <port>]` | Browse experiments locally with remote links to their folders. |
+| `expledger serve [--port <port>] [--source <root> ...]` | Browse live experiments across configured projects. |
 | `expledger help [command]` | Show help and available flags. |
 
 Initialize once from your project directory:
@@ -143,3 +143,10 @@ Preview the fixture experiments (remote links are placeholders):
 ```sh
 ./scripts/preview.sh --port 0
 ```
+
+For multi-project browsing, set `sources: [., ../experiment-worktree]` in
+`expledger.yaml`, or repeat `serve --source`. Paths resolve from that config's
+directory. The first source wins duplicate IDs; the browser refreshes every few
+seconds while retaining the selected view and graph scroll position. See
+[browsing multiple projects](docs/running.md#browsing-multiple-projects) for errors,
+refresh behavior, and CLI overrides. Other commands remain current-project only.

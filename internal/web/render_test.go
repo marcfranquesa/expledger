@@ -121,3 +121,29 @@ func TestGraphVerticalMarkup(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderSourceRemoteLinksAndOfflinePage(t *testing.T) {
+	records := []experiment.Record{
+		{ID: "local", Title: "Local"},
+		{ID: "other", Title: "Other"},
+		{ID: "fallback", Title: "Fallback"},
+	}
+	body, err := web.Render(records, web.PageOptions{
+		Project: "Sources", RemoteURL: "https://example.com/default",
+		RemoteURLs: map[string]string{"local": "", "other": "https://example.com/other/"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	for _, link := range []string{"https://example.com/other/other", "https://example.com/default/fallback"} {
+		if got := strings.Count(page, `href="`+link+`"`); got != 2 {
+			t.Errorf("link %q appears %d times; want list and graph", link, got)
+		}
+	}
+	for _, absent := range []string{"https://example.com/default/local", "https://example.com/default/other", "fetch(", "setTimeout(", "refresh-status\" role"} {
+		if strings.Contains(page, absent) {
+			t.Errorf("static page contains %q", absent)
+		}
+	}
+}

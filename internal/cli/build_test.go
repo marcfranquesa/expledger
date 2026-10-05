@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/cli"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
@@ -26,7 +27,20 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.Mkdir(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/expledger-preview/tree/preview/experiments"})
+	options := web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/expledger-preview/tree/preview/experiments"}
+	handler := web.NewHandler(root, options)
+	renderStatic := func() []byte {
+		t.Helper()
+		records, err := catalog.List(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := web.Render(records, options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
 	for _, output := range []string{"", "site/output", filepath.Join(t.TempDir(), "absolute")} {
 		args := []string{"build"}
 		dir := output
@@ -50,10 +64,8 @@ func TestBuildSnapshot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-		if response.Code != http.StatusOK || !bytes.Equal(body, response.Body.Bytes()) {
-			t.Fatal("build and serve produced different pages")
+		if !bytes.Equal(body, renderStatic()) || bytes.Contains(body, []byte("fetch(")) {
+			t.Fatal("build did not produce the offline catalog page")
 		}
 	}
 
@@ -84,7 +96,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err = os.ReadFile(path)
-	if err != nil || !bytes.Equal(snapshot, response.Body.Bytes()) {
+	if err != nil || !bytes.Equal(snapshot, renderStatic()) {
 		t.Fatalf("rebuild did not update the snapshot: %v", err)
 	}
 	if data, err := os.ReadFile(keep); err != nil || string(data) != "keep me" {

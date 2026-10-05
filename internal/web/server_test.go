@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
 
@@ -150,5 +152,50 @@ func TestEmptyCatalogAndRoutes(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", nil))
 	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != "GET, HEAD" {
 		t.Fatalf("POST response: %d %s", response.Code, response.Body)
+	}
+}
+
+// A failed read must not return a partially rendered page, and the next request
+// must invoke the loader again rather than retaining a failed snapshot.
+func TestLiveSnapshotReadErrorAndRecovery(t *testing.T) {
+	calls := 0
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) {
+		calls++
+		if calls == 2 {
+			return web.Snapshot{Records: []experiment.Record{{ID: "partial", Title: "Partial result"}}}, errors.New("unreadable source")
+		}
+		title := "Before"
+		remote := "https://example.com/before"
+		if calls > 2 {
+			title = "After"
+			remote = "https://example.com/after"
+		}
+		return web.Snapshot{
+			Records: []experiment.Record{{ID: "one", Title: title}},
+			Options: web.PageOptions{Project: "Live", RemoteURLs: map[string]string{"one": remote}},
+		}, nil
+	})
+	for i, route := range []string{"/", "/snapshot", "/snapshot"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, route, nil))
+		if response.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("snapshot response may be cached")
+		}
+		if i == 1 {
+			if response.Code != http.StatusInternalServerError || strings.Contains(response.Body.String(), "Partial result") {
+				t.Fatalf("failed snapshot returned partial content: %d %s", response.Code, response.Body)
+			}
+			continue
+		}
+		want := "https://example.com/before/one"
+		if i == 2 {
+			want = "https://example.com/after/one"
+		}
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), want) || !strings.Contains(response.Body.String(), "fetch('/snapshot'") {
+			t.Fatalf("snapshot response: %d %s", response.Code, response.Body)
+		}
+	}
+	if calls != 3 {
+		t.Fatalf("loader called %d times", calls)
 	}
 }

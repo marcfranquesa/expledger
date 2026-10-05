@@ -37,11 +37,14 @@ are unsupported, including within custom metadata.
 
 ## Project configuration
 
-The project root contains `expledger.yaml`, exactly one YAML mapping with one
-optional setting:
+The project root contains `expledger.yaml`, exactly one YAML mapping with optional settings:
 
 ```yaml
 remote_url: https://github.com/owner/repo/tree/main/experiments
+sources:
+  - .
+  - ../experiment-worktree
+  - /Users/me/projects/another-worktree
 ```
 
 Use `{}` for a local-only project. `remote_url` must be a string; an empty string
@@ -51,6 +54,25 @@ port. Credentials, queries, and fragments are rejected. A trailing slash is
 optional. Existing escaped path segments are retained, and each experiment ID
 is appended as an escaped path segment. No provider or branch is inferred.
 Unknown settings, duplicate keys, non-mappings, and multiple documents are errors.
+
+`sources` applies only to `serve`. Omit it to browse the current project only.
+An explicit list replaces that default; include `.` to retain the current project.
+The list must contain at least one nonblank string. Paths name project-root
+directories containing `expledger.yaml`; source lookup does not walk up to a parent.
+Relative paths resolve from the current project's config directory after resolving
+symlinks, even when invoked from a nested directory. Absolute paths are accepted. Neither `~` nor
+environment variables are expanded by ExpLedger (quote CLI arguments to prevent
+shell expansion).
+
+Sources are read in order. The first copy of an experiment ID wins completely,
+including its metadata, `based_on` relationships, and source's `remote_url`.
+The catalog shows one entry and graph node per ID, sorted newest first; ties retain
+source order and then directory-name order. Removing a winner reveals the next
+copy on the next successful refresh. Source configs supply remote URLs, but their
+own source lists are never followed. Every selected source must be readable and
+valid, including records shadowed by an earlier source. An error fails the whole
+snapshot; there are no partial results. Existing per-project filesystem boundaries
+apply independently to each root. Aggregation does not copy or synchronize files.
 
 Commands walk the current directory and its parents, selecting the nearest
 `expledger.yaml`. An invalid or unreadable nearest config is an error; discovery

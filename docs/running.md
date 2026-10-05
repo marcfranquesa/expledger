@@ -38,3 +38,30 @@ new runs. There is no automatic commit, dirty-state, timestamp, or outcome recor
 To reproduce a result, prepare the desired code yourself and retain experiment
 inputs, dependency lockfiles, datasets, and environment details in your notes.
 The runner does not create checkouts, copy files, or relocate outputs.
+
+## Browsing multiple projects
+
+Configure `sources` in the current project's `expledger.yaml` (see
+[the format contract](format.md#project-configuration)), then run `expledger serve`.
+To replace the configured list for this server process:
+
+```sh
+expledger serve --source . --source ../experiment-worktree --port 8080
+```
+
+Repeat `--source` once per root. Relative CLI paths also resolve from the discovered
+project config directory. Empty values are errors. The override remains active
+until the server stops, while other config changes are still reread.
+
+The browser polls every three seconds after the previous request finishes. Valid
+metadata, source order, relationships, and remote-link changes appear without a
+restart or page reload. The selected list/graph view, graph zoom, search text, and selected experiment
+are retained. Refreshed search results and details use current records. Page and
+graph scroll positions are retained within the new content's scroll limits.
+If the selected ID disappears from the graph, its selection clears; active drags defer updates
+until a later poll. On a failed refresh, the last
+valid view remains with an error indicator; the next successful poll recovers.
+
+`new`, `run`, `list`, `validate`, and `build` still operate only on the current
+project. A static `build` is an offline snapshot and never polls. `serve` is
+read-only, requires no Git, and does not discover worktrees or watch files.
