@@ -252,6 +252,11 @@
       const box = node => { const r = node.getBoundingClientRect(); return {x:r.left-origin.left, y:r.top-origin.top, w:r.width, h:r.height}; };
       const boxes = new Map(nodes.map(node => [node, box(node)]));
 
+      const rightEdges = new Map();
+      nodes.forEach(node => {
+        const group = node.closest('.graph-component'), r = boxes.get(node);
+        rightEdges.set(group, Math.max(rightEdges.get(group) || 0, r.x + r.w));
+      });
       const rowGap = parseFloat(getComputedStyle(graph.querySelector('.graph-row')).rowGap);
       paths.forEach(path => {
         const from = byID.get(path.dataset.from), to = byID.get(path.dataset.to);
@@ -267,7 +272,7 @@
           const bottom = a.y + a.h, gutter = bottom + 8;
           d = `M ${x-6} ${bottom} V ${gutter} H ${tx+6} V ${end}`;
         } else if (sameRow || +to.dataset.rank > +from.dataset.rank + 1 || y - end > rowGap + 1) {
-          const right = Math.max(...[...group.querySelectorAll('[data-node]')].map(node => { const r = boxes.get(node); return r.x+r.w; }));
+          const right = rightEdges.get(group);
           // Shared trunks collapse parallel routes; each edge keeps its own endpoints for highlighting.
           const side = right + 16;
           const start = sameRow ? a.y + a.h : y;
@@ -297,6 +302,7 @@
       });
     }
     function selectNode(node, center = false) {
+      if (search) search.value = '';
       selected = node;
       nodes.forEach(card => card.setAttribute('aria-pressed', card === node));
       details.replaceChildren();
@@ -339,14 +345,16 @@
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectNode(selected === node ? null : node, true); }
       });
       node.addEventListener('focus', () => highlight(node));
-      node.addEventListener('blur', () => highlight(selected));
+      node.addEventListener('blur', restoreHighlight);
       node.addEventListener('mouseenter', () => highlight(node));
-      node.addEventListener('mouseleave', () => highlight(selected));
+      node.addEventListener('mouseleave', restoreHighlight);
     });
     graph.addEventListener('keydown', event => {
       if (event.key !== 'Escape' || !details) return;
-      if (event.target.matches('input[type="search"]')) { event.target.value = ''; selectNode(selected); }
-      else selectNode(null);
+      const inSearch = event.target === search;
+      const target = inSearch || search?.value.trim() ? selected : null;
+      selectNode(target);
+      if (!inSearch) (target || scroll).focus({preventScroll: true});
     });
     graph.querySelectorAll('[data-zoom]').forEach(button => button.addEventListener('click', () => {
       setZoom(button.dataset.zoom === 'actual' ? 1 : zoom * (button.dataset.zoom === 'in' ? 1.4 : 1 / 1.4), selected);
@@ -367,7 +375,7 @@
         scroll.scrollTop += after.top + y * zoom - event.clientY;
       }, {passive: false});
       scroll.addEventListener('click', event => {
-        if (!dragged && !event.target.closest('[data-node]')) selectNode(null);
+        if (!dragged && !event.target.closest('[data-node]')) { selectNode(null); scroll.focus({preventScroll: true}); }
       });
       scroll.addEventListener('pointerdown', event => {
         dragged = false;
@@ -387,13 +395,21 @@
       scroll.addEventListener('lostpointercapture', () => { drag = null; });
     }
     const search = graph.querySelector('input[type="search"]');
+    function searchMatches() {
+      const query = search.value.trim().toLowerCase();
+      return nodes.filter(node => (node.querySelector('h2').textContent + ' ' + node.querySelector('.id').textContent).toLowerCase().includes(query));
+    }
+    function restoreHighlight() {
+      if (!search?.value.trim()) { highlight(selected); return; }
+      highlight(null);
+      canvas.classList.add('highlighting');
+      searchMatches().forEach(node => node.classList.add('related'));
+    }
     if (search) search.addEventListener('input', () => {
       if (!search.value.trim()) { selectNode(selected); return; }
       details.replaceChildren();
-      const matches = nodes.filter(node => (node.querySelector('h2').textContent + ' ' + node.querySelector('.id').textContent).toLowerCase().includes(search.value.trim().toLowerCase()));
-      highlight(null);
-      canvas.classList.add('highlighting');
-      matches.forEach(node => node.classList.add('related'));
+      const matches = searchMatches();
+      restoreHighlight();
       const heading = document.createElement('h2');
       heading.textContent = `${matches.length} experiment${matches.length === 1 ? '' : 's'}`;
       details.append(heading);
@@ -401,7 +417,7 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = node.querySelector('h2').textContent;
-        button.addEventListener('click', () => { search.value = ''; selectNode(node, true); node.focus({preventScroll: true}); });
+        button.addEventListener('click', () => { selectNode(node, true); node.focus({preventScroll: true}); });
         details.append(button);
       });
     });
@@ -415,9 +431,8 @@
         document.getElementById(control.dataset.view).hidden = !selected;
       });
       document.body.classList.toggle('graph-active', !graph.hidden);
-      drawGraph();
     });
-    new ResizeObserver(drawGraph).observe(graph);
+    if (scroll) new ResizeObserver(drawGraph).observe(scroll);
     document.fonts.ready.then(drawGraph);
   </script>
 </body>
