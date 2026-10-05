@@ -25,6 +25,7 @@ type experimentView struct {
 type page struct {
 	Project     string
 	Experiments []experimentView
+	Graph       graphView
 }
 
 // PageOptions supplies display metadata and an optional experiments-directory URL.
@@ -48,6 +49,7 @@ func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
 			RemoteURL: remoteURL,
 		})
 	}
+	data.Graph = lineage(records, data.Experiments)
 	var body bytes.Buffer
 	if err := indexTemplate.Execute(&body, data); err != nil {
 		return nil, fmt.Errorf("render experiments: %w", err)
