@@ -19,9 +19,10 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 	var port int
 	var sources []string
 	cmd := &cobra.Command{
-		Use:   "serve",
-		Short: serveDescription,
-		Long:  serveDetails,
+		Use:     "serve",
+		Short:   serveDescription,
+		Example: "  expledger serve\n  expledger serve --port 0\n  expledger serve --source . --source ../experiment-worktree",
+		Long:    serveDetails,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.NoArgs(cmd, args); err != nil {
 				return err

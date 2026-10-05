@@ -2,9 +2,14 @@ package cli
 
 const rootDescription = "Manage experiment records in an initialized project"
 
+const rootDetails = `Manage experiment records and run scripts in an initialized project.
+Run init once in the project directory. Other commands find the nearest
+expledger.yaml in the current directory or its parents. Help needs no project.
+See https://marcfranquesa.github.io/expledger/ for guides and configuration.`
+
 const newDescription = "Create an experiment folder, metadata, README, and run.sh"
 
-const newDetails = `Create experiment.yaml, README.md, and executable run.sh in experiments/YYYYMMDD-<slug>/ at the
+const newDetails = `Create experiment.yaml, README.md, and executable run.sh in experiments/YYYYMMDD-SLUG/ at the
 project root.
 The date uses your local time. Slugs contain lowercase letters, digits, and
 single hyphens between words. Existing experiments are never overwritten.
@@ -13,7 +18,7 @@ experiment.yaml whose id exactly matches its experiment folder name.`
 
 const runDescription = "Run an experiment's run.sh in its existing folder"
 
-const runDetails = `Execute ./run.sh from experiments/<id>/ with the current checkout and environment.
+const runDetails = `Execute ./run.sh from experiments/ID/ with the current checkout and environment.
 Keep workload parameters in run.sh or its input files; extra arguments are rejected.
 The script chooses output paths. Metadata is not changed and no provenance is
 recorded. Git is not required.
@@ -37,7 +42,7 @@ Ignore directories without experiment.yaml. Report invalid metadata with its pat
 
 const validateDescription = "Validate experiment metadata"
 
-const validateDetails = `Check experiments/<id>/experiment.yaml at the project root.
+const validateDetails = `Check experiments/ID/experiment.yaml at the project root.
 Require schema: expledger/v1 and valid id, title, and created_at fields.
 The YAML id must match the experiment folder name. README.md is independent.
 Report the first error with its file path; no files are changed.`

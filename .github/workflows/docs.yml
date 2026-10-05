@@ -1,0 +1,58 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install pinned Hugo
+        shell: bash
+        run: |
+          version=$(cat docs-site/hugo-version)
+          archive="hugo_extended_${version}_linux-amd64.tar.gz"
+          checksums="hugo_${version}_checksums.txt"
+          mkdir -p "$RUNNER_TEMP/hugo"
+          cd "$RUNNER_TEMP/hugo"
+          curl --fail --location --retry 3 --remote-name "https://github.com/gohugoio/hugo/releases/download/v${version}/${archive}"
+          curl --fail --location --retry 3 --remote-name "https://github.com/gohugoio/hugo/releases/download/v${version}/${checksums}"
+          grep " ${archive}$" "$checksums" | sha256sum --check --strict
+          tar -xzf "$archive" hugo
+          echo "$RUNNER_TEMP/hugo" >> "$GITHUB_PATH"
+      - name: Build guides and CLI reference
+        run: ./scripts/docs.sh --minify --panicOnWarning
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs-site/public
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment

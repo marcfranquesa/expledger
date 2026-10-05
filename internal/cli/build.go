@@ -16,9 +16,10 @@ import (
 func buildExperimentsCommand(app *application) *cobra.Command {
 	var output string
 	cmd := &cobra.Command{
-		Use:   "build",
-		Short: buildDescription,
-		Long:  buildDetails,
+		Use:     "build",
+		Short:   buildDescription,
+		Example: "  expledger build\n  expledger build --output ./site",
+		Long:    buildDetails,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.NoArgs(cmd, args); err != nil {
 				return err

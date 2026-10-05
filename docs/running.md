@@ -1,3 +1,8 @@
+---
+title: Running experiments
+weight: 30
+---
+
 # Running experiments
 
 `expledger new` creates an executable `experiments/<id>/run.sh` stub that exits
@@ -9,8 +14,8 @@ shebang and fixed parameters. For example, with `experiment.py` beside it:
 exec uv run --locked python experiment.py --seed 42
 ```
 
-Initialize the project with `expledger init`, then prepare the code and
-dependencies you want. Git is not required. Run:
+Follow [Getting started](getting-started.md) to initialize a project and create a
+record, then prepare the code and dependencies you want. Git is not required. Run:
 
 ```sh
 expledger run <id>
@@ -23,9 +28,9 @@ revision-selection options are rejected. Both `run.sh` and `experiment.yaml` mus
 be regular files, and `run.sh` must be executable. Supporting files are left to
 the script.
 
-On macOS and Linux, standard input from a pipe or file, both output streams, and
-the workload's exit status are forwarded. Ctrl-C stops the workload and its
-ordinary children. Use batch workloads; interactive terminal input, job control,
+Running is supported on macOS and Linux. Standard input from a pipe or file, both
+output streams, and the workload's exit status are forwarded. Ctrl-C stops the
+workload and its ordinary children. Use batch workloads; interactive terminal input, job control,
 and daemons are unsupported. Children must keep the workload's process group and
 user identity so ExpLedger can stop them.
 
@@ -39,10 +44,35 @@ To reproduce a result, prepare the desired code yourself and retain experiment
 inputs, dependency lockfiles, datasets, and environment details in your notes.
 The runner does not create checkouts, copy files, or relocate outputs.
 
+See the [CLI reference](https://marcfranquesa.github.io/expledger/docs/reference/expledger/) for commands
+and flags, and [Experiment format](format.md) for metadata and filesystem rules.
+
+## Experiment graph
+
+Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
+Descendants appear above ancestors, with arrows pointing upward. Independent
+lineages favor their newest terminal descendant, so a late-imported ancestor
+does not promote an older branch. Cycles are treated as a unit. Wide rows wrap;
+shared routes reduce edge clutter. Missing parents and cycles use dashed styling.
+
+Hover or focus previews direct connections; clicking pins selection and opens
+full metadata, remote links, and navigable parents/children. Click the selected
+node again, empty space, or Escape to clear it. Search by title or ID. Scroll or
+drag to pan; Ctrl/Command + wheel zooms around the pointer. The graph starts at
+75%; +/− and 100% adjust zoom without switching layouts. Double-click centers a
+node at 100%; Enter or Space selects and centers a focused node.
+
+A static `build` is self-contained and works offline. The list remains the default and
+works without JavaScript. Dependency structure takes precedence over date order;
+parent IDs in the details panel provide a text alternative to bundled arrows.
+
+Inspired by [Lab Exp's experiment graph](https://github.com/rsoatto/lab-exp),
+with an independent implementation using ExpLedger's metadata and renderer.
+
 ## Browsing multiple projects
 
 Configure `sources` in the current project's `expledger.yaml` (see
-[the format contract](format.md#project-configuration)), then run `expledger serve`.
+[Configuration](configuration.md#sources-for-live-browsing)), then run `expledger serve`.
 To replace the configured list for this server process:
 
 ```sh
