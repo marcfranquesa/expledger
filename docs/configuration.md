@@ -16,7 +16,7 @@ sources:
   - /Users/me/projects/another-worktree
 ```
 
-Set this when initializing a project:
+Set `remote_url` when initializing a project; add `sources` by editing the config:
 
 ```sh
 expledger init --remote-url https://github.com/owner/repo/tree/main/experiments

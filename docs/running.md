@@ -62,13 +62,12 @@ drag to pan; Ctrl/Command + wheel zooms around the pointer. The graph starts at
 75%; +/− and 100% adjust zoom without switching layouts. Double-click centers a
 node at 100%; Enter or Space selects and centers a focused node.
 
-The page is self-contained and works offline. The list remains the default and
+A static `build` is self-contained and works offline. The list remains the default and
 works without JavaScript. Dependency structure takes precedence over date order;
 parent IDs in the details panel provide a text alternative to bundled arrows.
 
 Inspired by [Lab Exp's experiment graph](https://github.com/rsoatto/lab-exp),
 with an independent implementation using ExpLedger's metadata and renderer.
-
 
 ## Browsing multiple projects
 
