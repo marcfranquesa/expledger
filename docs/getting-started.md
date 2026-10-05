@@ -12,16 +12,9 @@ development; expect breaking changes.
 
 ## Install
 
-Building requires Go 1.26 or later. Clone the source and install the CLI:
-
-```sh
-git clone https://github.com/marcfranquesa/expledger.git
-cd expledger
-go install ./cmd/expledger
-```
-
-Make sure Go's binary installation directory is on your `PATH`. The installed
-CLI has no Git dependency. Running experiment scripts requires macOS or Linux.
+Follow the [installation guide](install.md) to install the CLI and add it to your
+`PATH`. The installed CLI has no Git dependency. Running experiment scripts
+requires macOS or Linux.
 
 ## Create your first experiment
 

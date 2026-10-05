@@ -265,3 +265,16 @@ func writeMetadata(t *testing.T, root, id string, data []byte) string {
 	}
 	return metadata
 }
+
+func TestVersionWithoutProjectOrGit(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("PATH", t.TempDir())
+	var stdout bytes.Buffer
+	if err := cli.Run(context.Background(), []string{"--version"}, root, time.Now(), cli.Streams{Out: &stdout}); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); got != "expledger version devel\n" {
+		t.Fatalf("version output: %q", got)
+	}
+	assertEmptyDirectory(t, root)
+}

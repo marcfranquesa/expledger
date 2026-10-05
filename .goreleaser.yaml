@@ -1,0 +1,21 @@
+version: 2
+project_name: expledger
+dist: release-dist
+builds:
+  - main: ./cmd/expledger
+    binary: expledger
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [arm64, amd64]
+    flags: [-trimpath]
+    ldflags:
+      - '-s -w -X github.com/marcfranquesa/expledger/internal/version.release={{ if .IsSnapshot }}devel{{ else }}{{ .Tag }}{{ end }}'
+archives:
+  - formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files: [LICENSE]
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+changelog:
+  disable: true
