@@ -49,12 +49,16 @@ Create the output directory if needed and replace its index.html on each build.
 Other files in the directory are left unchanged. The root expledger.yaml's optional
 remote_url supplies the full browser URL of the remote experiments directory.
 An escaped experiment ID is appended; omit remote_url for a local-only catalog.
-The generated page needs no running ExpLedger server.`
+Only the current project is included; sources applies only to serve.
+The generated page needs no running ExpLedger server and does not poll.`
 
 const serveDescription = "Browse experiments in a local web page"
 
-const serveDetails = `Serve experiment titles and creation times, newest first, on 127.0.0.1.
-Refresh the page to reread experiment metadata. Remote links use remote_url from
-the root expledger.yaml when the server starts. It is the full browser URL of the
-remote experiments directory; omit it for a local-only catalog.
-Press Ctrl+C to stop the server.`
+const serveDetails = `Serve experiments on 127.0.0.1 with live list and lineage views.
+Poll configuration and records every few seconds without reloading the page.
+Use sources in expledger.yaml, or repeat --source to replace that list.
+Paths name project roots; relative paths resolve from the current project config
+directory. No ~ or environment-variable expansion is performed.
+The first source wins each ID, including its relationships and remote links.
+Other commands remain scoped to the current project. Failed refreshes keep the
+last valid view until recovery. Press Ctrl+C to stop the server.`

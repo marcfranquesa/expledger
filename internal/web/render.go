@@ -26,21 +26,30 @@ type page struct {
 	Project     string
 	Experiments []experimentView
 	Graph       graphView
+	Live        bool
 }
 
 // PageOptions supplies display metadata and an optional experiments-directory URL.
 type PageOptions struct {
 	Project, RemoteURL string
+	// RemoteURLs overrides the experiments-directory URL per record, including
+	// an empty URL for a source without remote links.
+	RemoteURLs map[string]string
+	Live       bool
 }
 
 // Render renders a complete HTML page with records in their supplied order.
 func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
-	data := page{Project: options.Project}
+	data := page{Project: options.Project, Live: options.Live}
 	for _, record := range records {
 		created := record.CreatedAt.UTC()
+		baseURL := options.RemoteURL
+		if sourceURL, ok := options.RemoteURLs[record.ID]; ok {
+			baseURL = sourceURL
+		}
 		var remoteURL string
-		if options.RemoteURL != "" {
-			remoteURL = strings.TrimRight(options.RemoteURL, "/") + "/" + url.PathEscape(record.ID)
+		if baseURL != "" {
+			remoteURL = strings.TrimRight(baseURL, "/") + "/" + url.PathEscape(record.ID)
 		}
 		data.Experiments = append(data.Experiments, experimentView{
 			ID: record.ID, Title: record.Title,

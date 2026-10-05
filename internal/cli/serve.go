@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 
 func serveExperimentsCommand(app *application) *cobra.Command {
 	var port int
+	var sources []string
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: serveDescription,
@@ -32,6 +32,10 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			load := func() (web.Snapshot, error) { return loadServeSnapshot(app.projectRoot, sources) }
+			if _, err := load(); err != nil {
+				return err
+			}
 			listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 			if err != nil {
 				return fmt.Errorf("start experiment server: %w", err)
@@ -44,9 +48,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			server := &http.Server{
-				Handler: web.NewHandler(app.projectRoot, web.PageOptions{
-					Project: filepath.Base(app.projectRoot), RemoteURL: app.config.RemoteURL,
-				}),
+				Handler:           web.NewLiveHandler(load),
 				ReadHeaderTimeout: 5 * time.Second,
 			}
 			finished := make(chan error, 1)
@@ -68,6 +70,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().StringArrayVar(&sources, "source", nil, "Project-root path relative to the current project config (repeatable; replaces configured sources)")
 	cmd.Flags().IntVar(&port, "port", 8080, "Local port (0 chooses an available port)")
 	return cmd
 }

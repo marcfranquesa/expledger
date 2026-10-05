@@ -4,19 +4,35 @@ import (
 	"net/http"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
+	"github.com/marcfranquesa/expledger/internal/experiment"
 )
+
+// Snapshot holds a complete catalog and the options belonging to that read.
+type Snapshot struct {
+	Records []experiment.Record
+	Options PageOptions
+}
 
 // NewHandler reads the catalog on each request using fixed page options.
 func NewHandler(root string, options PageOptions) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
+	return NewLiveHandler(func() (Snapshot, error) {
 		records, err := catalog.List(root)
+		return Snapshot{Records: records, Options: options}, err
+	})
+}
+
+// NewLiveHandler uses the same fresh snapshot for initial pages and polling.
+func NewLiveHandler(load func() (Snapshot, error)) http.Handler {
+	mux := http.NewServeMux()
+	render := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		snapshot, err := load()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		body, err := Render(records, options)
+		snapshot.Options.Live = true
+		body, err := Render(snapshot.Records, snapshot.Options)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -25,6 +41,8 @@ func NewHandler(root string, options PageOptions) http.Handler {
 		if r.Method == http.MethodGet {
 			_, _ = w.Write(body)
 		}
-	})
+	}
+	mux.HandleFunc("GET /{$}", render)
+	mux.HandleFunc("GET /snapshot", render)
 	return mux
 }

@@ -17,7 +17,8 @@ import (
 )
 
 type projectConfig struct {
-	RemoteURL string `yaml:"remote_url,omitempty"`
+	RemoteURL string   `yaml:"remote_url,omitempty"`
+	Sources   []string `yaml:"sources,omitempty"`
 }
 
 func readProjectConfig(path string) (projectConfig, error) {
@@ -52,20 +53,33 @@ func readProjectConfig(path string) (projectConfig, error) {
 			return config, errors.New("old experiment filename: rename this experiment's expledger.yaml to experiment.yaml, then run expledger init at the project root")
 		}
 	}
-	seen := false
+	seen := make(map[string]bool)
 	for i := 0; i < len(fields); i += 2 {
 		key, value := fields[i], fields[i+1]
-		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" || key.Value != "remote_url" {
-			return config, fmt.Errorf("unknown project setting %q; only remote_url is supported", key.Value)
+		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" || (key.Value != "remote_url" && key.Value != "sources") {
+			return config, fmt.Errorf("unknown project setting %q; only remote_url and sources are supported", key.Value)
 		}
-		if seen {
-			return config, errors.New("duplicate project setting remote_url")
+		if seen[key.Value] {
+			return config, fmt.Errorf("duplicate project setting %s", key.Value)
 		}
-		seen = true
-		if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
-			return config, errors.New("remote_url must be a string")
+		seen[key.Value] = true
+		switch key.Value {
+		case "remote_url":
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
+				return config, errors.New("remote_url must be a string")
+			}
+			config.RemoteURL = value.Value
+		case "sources":
+			if value.Kind != yaml.SequenceNode || len(value.Content) == 0 {
+				return config, errors.New("sources must be a nonempty list of project-root paths")
+			}
+			for _, source := range value.Content {
+				if source.Kind != yaml.ScalarNode || source.Tag != "!!str" || strings.TrimSpace(source.Value) == "" {
+					return config, errors.New("sources entries must be nonempty strings")
+				}
+				config.Sources = append(config.Sources, source.Value)
+			}
 		}
-		config.RemoteURL = value.Value
 	}
 	if err := validateRemoteURL(config.RemoteURL); err != nil {
 		return config, err
