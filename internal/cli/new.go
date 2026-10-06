@@ -25,6 +25,7 @@ func newExperimentCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Layout = app.config.Layout
 			dir, err := catalog.Create(app.projectRoot, args[0], app.now, opts)
 			if err != nil {
 				return err

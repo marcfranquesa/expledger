@@ -31,7 +31,7 @@ func TestBuildSnapshot(t *testing.T) {
 	handler := web.NewHandler(root, options)
 	renderStatic := func() []byte {
 		t.Helper()
-		records, err := catalog.List(root)
+		records, err := catalog.List(root, catalog.Layout{})
 		if err != nil {
 			t.Fatal(err)
 		}

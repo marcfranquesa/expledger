@@ -16,7 +16,7 @@ type Snapshot struct {
 // NewHandler reads the catalog on each request using fixed page options.
 func NewHandler(root string, options PageOptions) http.Handler {
 	return NewLiveHandler(func() (Snapshot, error) {
-		records, err := catalog.List(root)
+		records, err := catalog.List(root, catalog.Layout{})
 		return Snapshot{Records: records, Options: options}, err
 	})
 }

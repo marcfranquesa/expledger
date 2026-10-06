@@ -26,7 +26,7 @@ expledger new baseline
 ```
 
 Initialization creates a root `expledger.yaml`. The second command prints the
-new experiment directory, whose ID uses your local date:
+new experiment directory, whose default ID uses your local date:
 
 ```text
 my-project/
@@ -37,6 +37,10 @@ my-project/
         ├── README.md
         └── run.sh
 ```
+
+Customize the base folder and date/time layout with `experiments_dir` and
+`experiment_format` in `expledger.yaml`; see
+[Experiment folders and names](configuration.md#experiment-folders-and-names).
 
 Open that directory's README and describe the hypothesis and method. Replace the
 executable `run.sh` stub with your workload, keeping parameters in the script or

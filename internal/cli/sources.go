@@ -42,7 +42,7 @@ func loadServeSnapshot(root string, override []string) (web.Snapshot, error) {
 				return web.Snapshot{}, fmt.Errorf("read source %s: %w", path, err)
 			}
 		}
-		records, err := catalog.List(path)
+		records, err := catalog.List(path, sourceConfig.Layout)
 		if err != nil {
 			return web.Snapshot{}, fmt.Errorf("read source %s: %w", path, err)
 		}

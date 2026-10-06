@@ -12,48 +12,53 @@ import (
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
-// List reads immediate experiment directories and orders records by creation time, newest first.
-// Directories without experiment.yaml are ignored; metadata IDs must match directory names.
+// List walks grouping directories and orders records by creation time, newest first.
+// Experiment directories are leaves; metadata IDs must match their relative paths.
 // A missing experiments directory is an empty list.
-func List(root string) ([]experiment.Record, error) {
+func List(root string, layout Layout) ([]experiment.Record, error) {
+	if err := layout.Validate(); err != nil {
+		return nil, err
+	}
+	layout = layout.WithDefaults()
 	project, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("open project directory: %w", err)
 	}
 	defer project.Close()
-	info, err := project.Lstat("experiments")
+	err = checkDirectory(project, layout.ExperimentsDir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read experiments directory: %w", err)
 	}
-	if !info.IsDir() {
-		return nil, errors.New("experiments must be a directory, not a file or symlink")
-	}
-	entries, err := fs.ReadDir(project.FS(), "experiments")
-	if err != nil {
-		return nil, fmt.Errorf("read experiments directory: %w", err)
-	}
 	var records []experiment.Record
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		metadata := filepath.Join("experiments", entry.Name(), "experiment.yaml")
-		if _, err := project.Lstat(metadata); errors.Is(err, os.ErrNotExist) {
-			continue
-		} else if err != nil {
-			return nil, fmt.Errorf("read %s: %w", metadata, err)
-		}
-		if err := validateID(entry.Name()); err != nil {
-			return nil, err
-		}
-		record, err := readRecord(project, entry.Name())
+	err = fs.WalkDir(project.FS(), layout.ExperimentsDir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		if path == layout.ExperimentsDir || !entry.IsDir() {
+			return nil
+		}
+		metadata := filepath.Join(filepath.FromSlash(path), "experiment.yaml")
+		if _, err := project.Lstat(metadata); errors.Is(err, os.ErrNotExist) {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("read %s: %w", metadata, err)
+		}
+		id := path[len(layout.ExperimentsDir)+1:]
+		if err := validateID(id); err != nil {
+			return err
+		}
+		record, err := readRecord(project, layout.ExperimentsDir, id)
+		if err != nil {
+			return err
 		}
 		records = append(records, record)
+		return fs.SkipDir
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.SliceStable(records, func(i, j int) bool { return records[i].CreatedAt.After(records[j].CreatedAt) })
 	return records, nil

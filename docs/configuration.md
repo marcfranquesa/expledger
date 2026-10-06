@@ -9,6 +9,8 @@ The initialized project root contains `expledger.yaml`, exactly one YAML mapping
 with optional settings:
 
 ```yaml
+experiments_dir: experiments
+experiment_format: "20060102-{name}"
 remote_url: https://github.com/owner/repo/tree/main/experiments
 sources:
   - .
@@ -16,7 +18,7 @@ sources:
   - /Users/me/projects/another-worktree
 ```
 
-Set `remote_url` when initializing a project; add `sources` by editing the config:
+Set `remote_url` when initializing a project; edit the config for other settings:
 
 ```sh
 expledger init --remote-url https://github.com/owner/repo/tree/main/experiments
@@ -31,8 +33,48 @@ also disables links. A configured value is the full HTTP(S) browser URL of the
 remote experiments directory, with an ASCII hostname or IP address and optional
 port. Credentials, queries, and fragments are rejected. A trailing slash is
 optional. Existing escaped path segments are retained, and each experiment ID
-is appended as an escaped path segment. No provider or branch is inferred.
+is appended with each path segment escaped separately. No provider or branch is inferred.
 Unknown settings, duplicate keys, non-mappings, and multiple documents are errors.
+
+## Experiment folders and names
+
+`experiments_dir` selects the folder relative to the project root. It defaults to
+`experiments`. Use a nonblank relative path with `/` separators, such as
+`research/experiments`; absolute paths, empty components, `.`, `..`, backslashes,
+and symlinked directories are rejected. Changing this setting does not move
+existing experiments. Move their folders yourself if you want to retain them in
+the configured catalog.
+
+`experiment_format` controls IDs for `new` and defaults to `20060102-{name}`.
+It uses the standard [Go time layout](https://pkg.go.dev/time#Time.Format) with
+local time. Write the reference date's components in the positions you want:
+`2006` is the year, `01` the month, `02` the day, `15` the hour (24-hour clock),
+`04` the minute, and `05` the second. The optional `{name}` token inserts the
+command's slug after time formatting. Other brace tokens are rejected.
+
+| `experiment_format` | Example ID for `new baseline` at 14:23:45 on October 6, 2026 |
+| --- | --- |
+| `20060102-{name}` | `20261006-baseline` |
+| `2006-01-02/{name}` | `2026-10-06/baseline` |
+| `2006-01-02/15-04-05-{name}` | `2026-10-06/14-23-45-baseline` |
+| `05:04:15-{name}` | `45:23:14-baseline` |
+| `2006-01-02/15-04-05` | `2026-10-06/14-23-45` |
+
+For example, customize both settings in the root `expledger.yaml`:
+
+```yaml
+experiments_dir: research/trials
+experiment_format: "2006-01-02/15-04-05-{name}"
+```
+
+This creates `research/trials/2026-10-06/14-23-45-baseline/`. Its ID is
+`2026-10-06/14-23-45-baseline`; use that full ID for `run`, `validate`, and
+`--based-on`. IDs use canonical relative paths with the same path restrictions
+as `experiments_dir`. An existing path is an error; ExpLedger does not add a
+counter to resolve collisions. Below the first ID component, `experiment.yaml`
+is reserved for metadata and cannot name a directory. Changing the format affects
+only new experiments.
+Keep `remote_url` pointed at the published folder selected by `experiments_dir`.
 
 ## Sources for live browsing
 
@@ -49,7 +91,8 @@ Sources are read in order. The first copy of an experiment ID wins completely,
 including its metadata, `based_on` relationships, and source's `remote_url`.
 The catalog shows one entry and graph node per ID, sorted newest first; ties retain
 source order and then directory-name order. Removing a winner reveals the next
-copy on the next successful refresh. Source configs supply remote URLs, but their
+copy on the next successful refresh. Each source uses its own `experiments_dir`.
+Source configs supply remote URLs, but their
 own source lists are never followed. Every selected source must be readable and
 valid, including records shadowed by an earlier source. An error fails the whole
 snapshot; there are no partial results. Existing per-project filesystem boundaries

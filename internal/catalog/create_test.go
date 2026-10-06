@@ -69,7 +69,7 @@ func TestCreateScaffoldsExecutableRunner(t *testing.T) {
 	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 || !strings.Contains(string(output), "Configure run.sh") {
 		t.Fatalf("placeholder result = %q, %v; want configuration guidance and exit 1", output, err)
 	}
-	_, err = Read(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir))
+	_, err = Read(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir), Layout{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestCreateChecksOnlyDirectParents(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				record, err := Read(root, filepath.Base(dir))
+				record, err := Read(root, filepath.Base(dir), Layout{})
 				if err != nil || !reflect.DeepEqual(record.BasedOn, parents) {
 					t.Fatalf("created record = %+v, %v; want parents %v", record, err, parents)
 				}

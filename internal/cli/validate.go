@@ -16,10 +16,10 @@ func validateExperimentCommand(app *application) *cobra.Command {
 		Example: "  expledger validate 20260924-my-idea",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := catalog.Read(app.projectRoot, args[0]); err != nil {
+			if _, err := catalog.Read(app.projectRoot, args[0], app.config.Layout); err != nil {
 				return err
 			}
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Valid: %s\n", filepath.Join("experiments", args[0], "experiment.yaml"))
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Valid: %s\n", filepath.Join(app.config.ExperimentsDir, args[0], "experiment.yaml"))
 			return err
 		},
 	}

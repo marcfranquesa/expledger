@@ -27,7 +27,12 @@ func sourceWrite(t *testing.T, path, content string) {
 }
 func sourceRecord(t *testing.T, root, id, title, parent string) {
 	t.Helper()
-	dir := filepath.Join(root, "experiments", id)
+	sourceRecordIn(t, root, "experiments", id, title, parent)
+}
+
+func sourceRecordIn(t *testing.T, root, experimentsDir, id, title, parent string) {
+	t.Helper()
+	dir := filepath.Join(root, experimentsDir, id)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +41,39 @@ func sourceRecord(t *testing.T, root, id, title, parent string) {
 		content += "based_on: [" + parent + "]\n"
 	}
 	sourceWrite(t, filepath.Join(dir, "experiment.yaml"), content)
+}
+
+func TestServeSourcesUseEachProjectLayout(t *testing.T) {
+	base := t.TempDir()
+	root, other := filepath.Join(base, "root"), filepath.Join(base, "other")
+	sourceProject(t, root, "sources: [., ../other]\nexperiments_dir: local/trials\nexperiment_format: '2006-01-02/{name}'\nremote_url: https://first.example/local/trials")
+	sourceProject(t, other, "experiments_dir: remote/trials\nexperiment_format: '2006-01-02/15:04:05'\nremote_url: https://second.example/remote/trials")
+	now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.UTC)
+	for _, source := range []string{root, other} {
+		if err := Run(context.Background(), []string{"new", "trial"}, source, now, Streams{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := loadServeSnapshot(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Records) != 2 || snapshot.Records[0].ID != "2026-10-06/trial" || snapshot.Records[1].ID != "2026-10-06/18:17:16" {
+		t.Fatalf("records = %+v", snapshot.Records)
+	}
+	if snapshot.Options.RemoteURLs["2026-10-06/trial"] != "https://first.example/local/trials" || snapshot.Options.RemoteURLs["2026-10-06/18:17:16"] != "https://second.example/remote/trials" {
+		t.Fatalf("remote URLs = %+v", snapshot.Options.RemoteURLs)
+	}
+	sourceProject(t, other, "experiments_dir: missing/trials\n")
+	snapshot, err = loadServeSnapshot(root, nil)
+	if err != nil || len(snapshot.Records) != 1 || snapshot.Records[0].ID != "2026-10-06/trial" {
+		t.Fatalf("refreshed layout: %+v, %v", snapshot, err)
+	}
+	sourceProject(t, other, "experiments_dir: ../trials\n")
+	snapshot, err = loadServeSnapshot(root, nil)
+	if err == nil || len(snapshot.Records) != 0 {
+		t.Fatalf("invalid source layout: %+v, %v", snapshot, err)
+	}
 }
 
 func TestSourceConfigValidation(t *testing.T) {

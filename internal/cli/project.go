@@ -12,17 +12,19 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 )
 
 type projectConfig struct {
-	RemoteURL string   `yaml:"remote_url,omitempty"`
-	Sources   []string `yaml:"sources,omitempty"`
+	catalog.Layout `yaml:",inline"`
+	RemoteURL      string   `yaml:"remote_url,omitempty"`
+	Sources        []string `yaml:"sources,omitempty"`
 }
 
 func readProjectConfig(path string) (projectConfig, error) {
-	var config projectConfig
+	config := projectConfig{Layout: (catalog.Layout{}).WithDefaults()}
 	info, err := os.Stat(path)
 	if err != nil {
 		return config, err
@@ -56,8 +58,8 @@ func readProjectConfig(path string) (projectConfig, error) {
 	seen := make(map[string]bool)
 	for i := 0; i < len(fields); i += 2 {
 		key, value := fields[i], fields[i+1]
-		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" || (key.Value != "remote_url" && key.Value != "sources") {
-			return config, fmt.Errorf("unknown project setting %q; only remote_url and sources are supported", key.Value)
+		if key.Kind != yaml.ScalarNode || key.Tag != "!!str" || (key.Value != "remote_url" && key.Value != "sources" && key.Value != "experiments_dir" && key.Value != "experiment_format") {
+			return config, fmt.Errorf("unknown project setting %q; supported settings are remote_url, sources, experiments_dir, and experiment_format", key.Value)
 		}
 		if seen[key.Value] {
 			return config, fmt.Errorf("duplicate project setting %s", key.Value)
@@ -69,6 +71,18 @@ func readProjectConfig(path string) (projectConfig, error) {
 				return config, errors.New("remote_url must be a string")
 			}
 			config.RemoteURL = value.Value
+		case "experiments_dir", "experiment_format":
+			if value.Kind != yaml.ScalarNode || value.Tag != "!!str" {
+				return config, fmt.Errorf("%s must be a string", key.Value)
+			}
+			if value.Value == "" {
+				return config, fmt.Errorf("%s must not be empty", key.Value)
+			}
+			if key.Value == "experiments_dir" {
+				config.ExperimentsDir = value.Value
+			} else {
+				config.ExperimentFormat = value.Value
+			}
 		case "sources":
 			if value.Kind != yaml.SequenceNode || len(value.Content) == 0 {
 				return config, errors.New("sources must be a nonempty list of project-root paths")
@@ -82,6 +96,9 @@ func readProjectConfig(path string) (projectConfig, error) {
 		}
 	}
 	if err := validateRemoteURL(config.RemoteURL); err != nil {
+		return config, err
+	}
+	if err := config.Layout.Validate(); err != nil {
 		return config, err
 	}
 	return config, nil
