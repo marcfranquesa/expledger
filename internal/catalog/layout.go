@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/lestrrat-go/strftime"
 )
 
 // Layout controls where experiments live and how new experiment IDs are named.
@@ -20,7 +18,7 @@ func (l Layout) WithDefaults() Layout {
 		l.ExperimentsDir = "experiments"
 	}
 	if l.ExperimentFormat == "" {
-		l.ExperimentFormat = "{date:%Y%m%d}-{slug}"
+		l.ExperimentFormat = "{date:20060102}-{slug}"
 	}
 	return l
 }
@@ -65,19 +63,15 @@ func formatExperimentID(format, slug string, now time.Time) (string, error) {
 			result.WriteString(slug)
 		case "date", "time":
 			if custom && layout == "" {
-				return "", fmt.Errorf("{%s:...} requires a nonempty strftime format", key)
+				return "", fmt.Errorf("{%s:...} requires a nonempty Go time layout", key)
 			}
 			if !custom {
-				layout = "%Y-%m-%d"
+				layout = "2006-01-02"
 				if key == "time" {
-					layout = "%H-%M-%S"
+					layout = "15-04-05"
 				}
 			}
-			value, err := strftime.Format(layout, now)
-			if err != nil {
-				return "", fmt.Errorf("invalid %s format %q: %w", key, layout, err)
-			}
-			result.WriteString(value)
+			result.WriteString(now.Format(layout))
 		default:
 			return "", fmt.Errorf("unknown placeholder {%s}; use {slug}, {date}, or {time}", token)
 		}

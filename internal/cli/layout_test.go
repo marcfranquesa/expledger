@@ -94,8 +94,9 @@ func TestCustomLayoutDateAndTimePlaceholders(t *testing.T) {
 		id     string
 	}{
 		{"{date}/{time}", "2026-10-06/18-17-16"},
-		{"{date:%Y%m%d}/{time:%H:%M}-{slug}", "20261006/18:17-trial"},
-		{"{date}/{time:%S:%M:%H}", "2026-10-06/16:17:18"},
+		{"{date:20060102}/{time:15:04}-{slug}", "20261006/18:17-trial"},
+		{"{date:2006-01-02}/{time:15:04}-{slug}", "2026-10-06/18:17-trial"},
+		{"{date}/{time:05:04:15}", "2026-10-06/16:17:18"},
 		{"2006-01-02/{slug}", "2006-01-02/trial"},
 	} {
 		t.Run(tt.format, func(t *testing.T) {
@@ -104,7 +105,7 @@ func TestCustomLayoutDateAndTimePlaceholders(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.UTC)
+			now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.FixedZone("local", -7*60*60))
 			var out bytes.Buffer
 			if err := cli.Run(context.Background(), []string{"new", "trial"}, root, now, cli.Streams{Out: &out}); err != nil {
 				t.Fatal(err)
@@ -138,12 +139,11 @@ func TestLayoutConfigRejectsInvalidValues(t *testing.T) {
 		"experiment_format: '{date}/experiment.yaml/{slug}'",
 		"experiment_format: '{date'", "experiment_format: 'date}'",
 		"experiment_format: '{}'", "experiment_format: '{{date}}'",
-		"experiment_format: '{slug:%Y}'",
+		"experiment_format: '{slug:2006}'",
 		"experiment_format: '{date:}'", "experiment_format: '{time:}'",
 		"experiment_format: '{date:{time}}'",
-		"experiment_format: '{date:../%Y}/{slug}'",
-		"experiment_format: '{time:%H\\%M}/{slug}'",
-		"experiment_format: '{time:%q}'", "experiment_format: '{date:%}'",
+		"experiment_format: '{date:../2006}/{slug}'",
+		"experiment_format: '{time:15\\04}/{slug}'",
 		"experiments_dir: trials\nexperiments_dir: trials",
 		"experiment_format: '{slug}'\nexperiment_format: '{slug}'",
 	} {
