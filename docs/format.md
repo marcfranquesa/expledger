@@ -5,8 +5,10 @@ weight: 40
 
 # Experiment format
 
-Each experiment has `experiments/<id>/experiment.yaml` under the initialized project
-root (see [Configuration](configuration.md)). This file is the sole source of
+Each experiment has `<experiments_dir>/<id>/experiment.yaml` under the initialized
+project root. The directory defaults to `experiments`; see
+[Configuration](configuration.md#experiment-folders-and-names) to customize it
+and the creation format. This file is the sole source of
 ExpLedger metadata. `README.md` holds independent notes; other files can hold
 scripts, artifacts, or another tool's
 metadata. `new` creates a README and an executable `run.sh` stub; neither file is
@@ -29,7 +31,7 @@ another tool's front matter, are never parsed or updated by ExpLedger.
 | Field | Contract |
 | --- | --- |
 | `schema` | Required string, exactly `expledger/v1`. Missing, foreign, and unsupported versions are errors. |
-| `id` | Required nonblank string, exactly matching the experiment folder's name, including case and whitespace. |
+| `id` | Required nonblank string, exactly matching the experiment's path relative to `experiments_dir`, including case and whitespace. Use `/` separators for nested paths. |
 | `title` | Required nonblank string. It does not determine the ID or folder name. |
 | `created_at` | Required nonzero RFC3339 timestamp with a timezone, such as `2026-09-24T12:00:00Z` or `2026-09-24T08:00:00-04:00`. Quoted timestamps are accepted. |
 | `based_on` | Optional list of nonblank strings naming direct parent experiments. |
@@ -43,14 +45,17 @@ are unsupported, including within custom metadata.
 
 ## IDs and creation
 
-`new <slug>` generates `YYYYMMDD-<slug>` using the local date. Slugs use lowercase
+By default, `new <slug>` generates `YYYYMMDD-<slug>` using the local date. Configure
+`experiment_format` with `{date}`, `{time}`, and `{slug}` placeholders to use
+other dates, timestamps, or nested paths, such as `{date}/{time}-{slug}`. Slugs use lowercase
 ASCII letters, digits, and single hyphens between words. New records store
 `created_at` in UTC, so its UTC date can differ from the date in the ID.
 
 Existing IDs need not follow the generated date/slug convention. Spaces and
-Unicode are supported. An ID must be one nonblank directory name: `.`, `..`,
-slashes, backslashes, and NUL bytes are rejected. The YAML ID must equal the
-actual directory entry, even on a case-insensitive filesystem.
+Unicode are supported. An ID must be a canonical nonblank relative path:
+absolute paths, empty components, `.`, `..`, backslashes, and NUL bytes are
+rejected. `/` separates path components. The YAML ID must equal the actual
+relative path, even on a case-insensitive filesystem.
 
 Creation writes a plain Markdown notes template, the YAML metadata file, and an
 executable `run.sh` stub that exits with an error until replaced with a workload.
@@ -62,7 +67,7 @@ before creating the child. An omitted title is derived from the slug;
 ## Parent references and validation
 
 `new --based-on <id>` requires each named parent to have valid `experiment.yaml`
-metadata and a matching directory ID. Repeat the flag to record multiple parents.
+metadata and a matching relative path ID. Repeat the flag to record multiple parents.
 Only named direct parents are validated; unrelated experiments and their ancestors
 are not read. Parent order is retained.
 
@@ -73,18 +78,19 @@ the record or automatically repair its metadata.
 
 ## Discovery and preservation
 
-`list` reads immediate experiment directories containing `experiment.yaml` and
+`list` recursively reads experiment directories containing `experiment.yaml` and
 sorts by `created_at`, newest first. Equal timestamps retain directory-name order.
-A missing `experiments` directory is an empty catalog. Loose files, nested artifact
-directories, and symlinked child directories are not discovered as experiments.
-Directories without
-`experiment.yaml` are ignored, regardless of their README contents. A present but
+A missing configured experiments directory is an empty catalog. Directories
+without `experiment.yaml` are explored as grouping folders, regardless of their
+README contents. Discovery stops at an experiment folder, so nested artifacts
+are not read as experiments. Loose files and symlinked child directories are
+ignored. A present but
 unreadable or invalid metadata file fails the operation with no partial list;
 a dangling metadata symlink is an error. `build` and `serve`
 use the same catalog rules.
 
-The `experiments` directory and directly requested experiment directories must
-be real directories. Metadata must resolve to a regular file. Relative metadata
+The configured experiments directory and every directory component of a requested
+ID must be real directories. Metadata must resolve to a regular file. Relative metadata
 symlinks that stay within the project root are readable; absolute links and paths
 that escape the root are rejected.
 Running requires `experiment.yaml` and executable `run.sh` to be regular files,

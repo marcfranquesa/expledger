@@ -12,7 +12,7 @@ func TestRead(t *testing.T) {
 	root := t.TempDir()
 	const content = "schema: expledger/v1\nid: example\ntitle: Example\ncreated_at: 2026-09-24T14:30:00Z\nbased_on: [missing]\ncustom: keep-me\n"
 	writeMetadata(t, root, "example", content)
-	record, err := Read(root, "example")
+	record, err := Read(root, "example", Layout{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,8 +29,8 @@ func TestRead(t *testing.T) {
 func TestReadRejectsMismatchedID(t *testing.T) {
 	root := t.TempDir()
 	writeMetadata(t, root, "20260924-test", "schema: expledger/v1\nid: 20260924-other\ntitle: Test\ncreated_at: 2026-09-24T14:30:00Z\n")
-	_, err := Read(root, "20260924-test")
-	want := "invalid " + filepath.Join("experiments", "20260924-test", "experiment.yaml") + ": YAML id \"20260924-other\" must match folder name \"20260924-test\""
+	_, err := Read(root, "20260924-test", Layout{})
+	want := "invalid " + filepath.Join("experiments", "20260924-test", "experiment.yaml") + ": YAML id \"20260924-other\" must match experiment path \"20260924-test\""
 	if err == nil || err.Error() != want {
 		t.Fatalf("Read error = %v, want %q", err, want)
 	}
@@ -39,16 +39,16 @@ func TestReadRejectsMismatchedID(t *testing.T) {
 func TestReadReportsParseErrorWithPath(t *testing.T) {
 	root := t.TempDir()
 	writeMetadata(t, root, "example", "schema: expledger/v1\nid: [\n")
-	_, err := Read(root, "example")
+	_, err := Read(root, "example", Layout{})
 	if err == nil || !strings.Contains(err.Error(), filepath.Join("experiments", "example", "experiment.yaml")) || !strings.Contains(err.Error(), "parse metadata") {
 		t.Fatalf("Read error = %v, want metadata path and parser error", err)
 	}
 }
 
 func TestReadRejectsInvalidID(t *testing.T) {
-	for _, id := range []string{"", " ", ".", "..", "../outside", "nested/experiment", `nested\experiment`, "nul\x00id"} {
+	for _, id := range []string{"", " ", ".", "..", "../outside", "nested//experiment", `nested\experiment`, "nul\x00id"} {
 		t.Run(id, func(t *testing.T) {
-			if _, err := Read(t.TempDir(), id); err == nil || !strings.Contains(err.Error(), "invalid experiment ID") {
+			if _, err := Read(t.TempDir(), id, Layout{}); err == nil || !strings.Contains(err.Error(), "invalid experiment ID") {
 				t.Fatalf("Read error = %v, want invalid experiment ID", err)
 			}
 		})
@@ -68,13 +68,13 @@ func TestReadRejectsMetadataOutsideProject(t *testing.T) {
 	if err := os.Symlink(target, filepath.Join(dir, "experiment.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Read(root, "example"); err == nil || !strings.Contains(err.Error(), "read "+filepath.Join("experiments", "example", "experiment.yaml")) {
+	if _, err := Read(root, "example", Layout{}); err == nil || !strings.Contains(err.Error(), "read "+filepath.Join("experiments", "example", "experiment.yaml")) {
 		t.Fatalf("Read error = %v, want an error reading escaped metadata", err)
 	}
 }
 
 func TestReadMissingExperiment(t *testing.T) {
-	if _, err := Read(t.TempDir(), "missing"); !errors.Is(err, os.ErrNotExist) {
+	if _, err := Read(t.TempDir(), "missing", Layout{}); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Read error = %v, want os.ErrNotExist", err)
 	}
 }
@@ -97,7 +97,7 @@ func TestReadRejectsNonDirectories(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := Read(root, "example"); err == nil || !strings.Contains(err.Error(), location+" must be a directory") {
+				if _, err := Read(root, "example", Layout{}); err == nil || !strings.Contains(err.Error(), location+" must be a directory") {
 					t.Fatalf("Read error = %v, want directory type error", err)
 				}
 			})

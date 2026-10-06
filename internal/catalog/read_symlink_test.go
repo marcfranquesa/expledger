@@ -24,11 +24,11 @@ func TestReadsRelativeMetadataSymlinkWithinProject(t *testing.T) {
 	if err := os.Symlink(relativeTarget, metadata); err != nil {
 		t.Fatal(err)
 	}
-	record, err := Read(root, "linked")
+	record, err := Read(root, "linked", Layout{})
 	if err != nil || record.ID != "linked" || record.Title != "Linked" {
 		t.Fatalf("Read = %+v, %v; want linked metadata", record, err)
 	}
-	records, err := List(root)
+	records, err := List(root, Layout{})
 	if err != nil || len(records) != 1 || !reflect.DeepEqual(records[0], record) {
 		t.Fatalf("List = %+v, %v; want the same linked record", records, err)
 	}

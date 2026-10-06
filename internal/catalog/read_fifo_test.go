@@ -15,8 +15,8 @@ import (
 
 func TestRejectsFIFOMetadata(t *testing.T) {
 	if root := os.Getenv("EXPLEDGER_TEST_FIFO_ROOT"); root != "" {
-		_, readErr := Read(root, "pipe")
-		_, listErr := List(root)
+		_, readErr := Read(root, "pipe", Layout{})
+		_, listErr := List(root, Layout{})
 		_, createErr := Create(root, "child", time.Now(), CreateOptions{BasedOn: []string{"pipe"}})
 		for operation, err := range map[string]error{"read": readErr, "list": listErr, "parent": createErr} {
 			if err == nil || !strings.Contains(err.Error(), "regular file") || !strings.Contains(err.Error(), "experiment.yaml") {

@@ -49,7 +49,11 @@ func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
 		}
 		var remoteURL string
 		if baseURL != "" {
-			remoteURL = strings.TrimRight(baseURL, "/") + "/" + url.PathEscape(record.ID)
+			segments := strings.Split(record.ID, "/")
+			for i, segment := range segments {
+				segments[i] = url.PathEscape(segment)
+			}
+			remoteURL = strings.TrimRight(baseURL, "/") + "/" + strings.Join(segments, "/")
 		}
 		data.Experiments = append(data.Experiments, experimentView{
 			ID: record.ID, Title: record.Title,

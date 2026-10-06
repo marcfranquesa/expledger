@@ -29,13 +29,13 @@ func runExperimentCommand(app *application) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return runExperiment(ctx, cmd, app.projectRoot, args[0])
+			return runExperiment(ctx, cmd, app.projectRoot, args[0], app.config.Layout)
 		},
 	}
 }
 
-func runExperiment(ctx context.Context, cli *cobra.Command, root, id string) error {
-	if _, err := catalog.Read(root, id); err != nil {
+func runExperiment(ctx context.Context, cli *cobra.Command, root, id string, layout catalog.Layout) error {
+	if _, err := catalog.Read(root, id, layout); err != nil {
 		return err
 	}
 	project, err := os.OpenRoot(root)
@@ -43,7 +43,7 @@ func runExperiment(ctx context.Context, cli *cobra.Command, root, id string) err
 		return err
 	}
 	defer project.Close()
-	experimentPath := filepath.Join("experiments", id)
+	experimentPath := filepath.Join(layout.ExperimentsDir, id)
 	for _, name := range []string{"experiment.yaml", "run.sh"} {
 		info, err := project.Lstat(filepath.Join(experimentPath, name))
 		if err != nil {

@@ -5,7 +5,7 @@ weight: 30
 
 # Running experiments
 
-`expledger new` creates an executable `experiments/<id>/run.sh` stub that exits
+`expledger new` creates an executable `<experiments_dir>/<id>/run.sh` stub that exits
 with configuration guidance. Replace it with the experiment's commands, using a
 shebang and fixed parameters. For example, with `experiment.py` beside it:
 
@@ -22,6 +22,8 @@ expledger run <id>
 ```
 
 ExpLedger executes `./run.sh` directly from the existing experiment directory.
+Use the full ID relative to the configured experiments folder, including any
+grouping path such as `2026-10-06/baseline`.
 The script inherits your environment and writes results wherever it chooses.
 Keep parameters in the script or nearby configuration; additional arguments and
 revision-selection options are rejected. Both `run.sh` and `experiment.yaml` must

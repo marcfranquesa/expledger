@@ -9,6 +9,8 @@ The initialized project root contains `expledger.yaml`, exactly one YAML mapping
 with optional settings:
 
 ```yaml
+experiments_dir: experiments
+experiment_format: "{date:%Y%m%d}-{slug}"
 remote_url: https://github.com/owner/repo/tree/main/experiments
 sources:
   - .
@@ -16,7 +18,7 @@ sources:
   - /Users/me/projects/another-worktree
 ```
 
-Set `remote_url` when initializing a project; add `sources` by editing the config:
+Set `remote_url` when initializing a project; edit the config for other settings:
 
 ```sh
 expledger init --remote-url https://github.com/owner/repo/tree/main/experiments
@@ -31,8 +33,65 @@ also disables links. A configured value is the full HTTP(S) browser URL of the
 remote experiments directory, with an ASCII hostname or IP address and optional
 port. Credentials, queries, and fragments are rejected. A trailing slash is
 optional. Existing escaped path segments are retained, and each experiment ID
-is appended as an escaped path segment. No provider or branch is inferred.
+is appended with each path segment escaped separately. No provider or branch is inferred.
 Unknown settings, duplicate keys, non-mappings, and multiple documents are errors.
+
+## Experiment folders and names
+
+`experiments_dir` selects the folder relative to the project root. It defaults to
+`experiments`. Use a nonblank relative path with `/` separators, such as
+`research/experiments`; absolute paths, empty components, `.`, `..`, backslashes,
+and symlinked directories are rejected. Changing this setting does not move
+existing experiments. Move their folders yourself if you want to retain them in
+the configured catalog.
+
+`experiment_format` controls IDs for `new` and defaults to
+`{date:%Y%m%d}-{slug}`. Add these placeholders wherever you want them:
+
+| Placeholder | Value |
+| --- | --- |
+| `{date}` | Local date using `%Y-%m-%d`, for example `2026-10-06`. |
+| `{time}` | Local time using `%H-%M-%S`, for example `14-23-45`. |
+| `{slug}` | The positional argument to `new <slug>`, for example `baseline`. |
+| `{date:format}` or `{time:format}` | Local date/time formatted with the supplied strftime directives. |
+
+Custom formats use standard strftime directives: `%Y` for the year, `%m` for the
+month, `%d` for the day, `%H` for the hour (24-hour clock), `%M` for the minute,
+`%S` for the second, and `%%` for a literal percent sign. See the
+[supported conversion specifications](https://github.com/lestrrat-go/strftime#supported-conversion-specifications)
+for the full list. Only the text inside date/time placeholders is interpreted
+as a format. Literal text outside placeholders stays unchanged, so
+`baseline-2006-{slug}` retains the literal `2006`.
+
+Placeholders can repeat or be omitted, allowing slug-only, time-only, and literal
+IDs. Unknown placeholders or conversion directives, unmatched or malformed braces,
+`{slug:format}`, and empty formats such as `{date:}` are rejected.
+
+| `experiment_format` | Example ID for `new baseline` at 14:23:45 on October 6, 2026 |
+| --- | --- |
+| `{date:%Y%m%d}-{slug}` | `20261006-baseline` |
+| `{date}/{slug}` | `2026-10-06/baseline` |
+| `{date}/{time}-{slug}` | `2026-10-06/14-23-45-baseline` |
+| `{date:%Y-%m-%d}/{time:%H:%M}-{slug}` | `2026-10-06/14:23-baseline` |
+| `{time:%S:%M:%H}-{slug}` | `45:23:14-baseline` |
+| `{date}/{time}` | `2026-10-06/14-23-45` |
+| `baseline-2006-{slug}` | `baseline-2006-baseline` |
+
+For example, customize both settings in the root `expledger.yaml`:
+
+```yaml
+experiments_dir: research/trials
+experiment_format: "{date}/{time}-{slug}"
+```
+
+This creates `research/trials/2026-10-06/14-23-45-baseline/`. Its ID is
+`2026-10-06/14-23-45-baseline`; use that full ID for `run`, `validate`, and
+`--based-on`. IDs use canonical relative paths with the same path restrictions
+as `experiments_dir`. An existing path is an error; ExpLedger does not add a
+counter to resolve collisions. Below the first ID component, `experiment.yaml`
+is reserved for metadata and cannot name a directory. Changing the format affects
+only new experiments.
+Keep `remote_url` pointed at the published folder selected by `experiments_dir`.
 
 ## Sources for live browsing
 
@@ -49,7 +108,8 @@ Sources are read in order. The first copy of an experiment ID wins completely,
 including its metadata, `based_on` relationships, and source's `remote_url`.
 The catalog shows one entry and graph node per ID, sorted newest first; ties retain
 source order and then directory-name order. Removing a winner reveals the next
-copy on the next successful refresh. Source configs supply remote URLs, but their
+copy on the next successful refresh. Each source uses its own `experiments_dir`.
+Source configs supply remote URLs, but their
 own source lists are never followed. Every selected source must be readable and
 valid, including records shadowed by an earlier source. An error fails the whole
 snapshot; there are no partial results. Existing per-project filesystem boundaries

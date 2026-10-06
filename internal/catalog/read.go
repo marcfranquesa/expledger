@@ -1,8 +1,8 @@
 package catalog
 
 import (
+	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,9 +10,13 @@ import (
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
-// Read loads one experiment's metadata and requires its ID to match the folder name.
-// It does not read parent experiments or change any files.
-func Read(root, id string) (experiment.Record, error) {
+// Read loads one experiment's metadata and requires its ID to match its relative path.
+// It does not load parent experiment metadata or change any files.
+func Read(root, id string, layout Layout) (experiment.Record, error) {
+	if err := layout.Validate(); err != nil {
+		return experiment.Record{}, err
+	}
+	layout = layout.WithDefaults()
 	if err := validateID(id); err != nil {
 		return experiment.Record{}, err
 	}
@@ -21,37 +25,37 @@ func Read(root, id string) (experiment.Record, error) {
 		return experiment.Record{}, fmt.Errorf("open project directory: %w", err)
 	}
 	defer project.Close()
-	if err := checkExperimentDirectory(project, id); err != nil {
+	if err := checkExperimentDirectory(project, layout.ExperimentsDir, id); err != nil {
 		return experiment.Record{}, err
 	}
-	return readRecord(project, id)
+	return readRecord(project, layout.ExperimentsDir, id)
 }
 
-func checkExperimentDirectory(project *os.Root, id string) error {
-	for _, path := range []string{"experiments", filepath.Join("experiments", id)} {
-		info, err := project.Lstat(path)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "experiment.yaml"), err)
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("%s must be a directory, not a file or symlink", path)
-		}
+func checkExperimentDirectory(project *os.Root, directory, id string) error {
+	path := filepath.Join(directory, filepath.FromSlash(id))
+	if err := checkDirectory(project, filepath.ToSlash(path)); err != nil {
+		return fmt.Errorf("read %s: %w", filepath.Join(path, "experiment.yaml"), err)
 	}
-	entries, err := fs.ReadDir(project.FS(), "experiments")
-	if err != nil {
-		return fmt.Errorf("read experiments directory: %w", err)
-	}
-	// Path lookup can ignore case or Unicode normalization on some filesystems.
-	for _, entry := range entries {
-		if entry.Name() == id {
-			return nil
-		}
-	}
-	return fmt.Errorf("read %s: %w", filepath.Join("experiments", id, "experiment.yaml"), os.ErrNotExist)
+	return checkExperimentAncestors(project, directory, id)
 }
 
-func readRecord(project *os.Root, id string) (experiment.Record, error) {
-	metadata := filepath.Join("experiments", id, "experiment.yaml")
+func checkExperimentAncestors(project *os.Root, directory, id string) error {
+	parts := strings.Split(id, "/")
+	path := filepath.FromSlash(directory)
+	for _, part := range parts[:len(parts)-1] {
+		path = filepath.Join(path, part)
+		metadata := filepath.Join(path, "experiment.yaml")
+		if _, err := project.Lstat(metadata); err == nil {
+			return fmt.Errorf("%s is inside an existing experiment at %s", id, path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("read %s: %w", metadata, err)
+		}
+	}
+	return nil
+}
+
+func readRecord(project *os.Root, directory, id string) (experiment.Record, error) {
+	metadata := filepath.Join(filepath.FromSlash(directory), filepath.FromSlash(id), "experiment.yaml")
 	info, err := project.Stat(metadata)
 	if err != nil {
 		return experiment.Record{}, fmt.Errorf("read %s: %w", metadata, err)
@@ -72,14 +76,7 @@ func parseRecord(metadata, id string, data []byte) (experiment.Record, error) {
 		return experiment.Record{}, fmt.Errorf("parse %s: %w", metadata, err)
 	}
 	if record.ID != id {
-		return experiment.Record{}, fmt.Errorf("invalid %s: YAML id %q must match folder name %q", metadata, record.ID, id)
+		return experiment.Record{}, fmt.Errorf("invalid %s: YAML id %q must match experiment path %q", metadata, record.ID, id)
 	}
 	return record, nil
-}
-
-func validateID(id string) error {
-	if strings.TrimSpace(id) == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\\x00") {
-		return fmt.Errorf("invalid experiment ID %q: use a single nonempty directory name", id)
-	}
-	return nil
 }

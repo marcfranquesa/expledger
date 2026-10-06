@@ -66,17 +66,23 @@ func TestRenderWithoutRemoteLinks(t *testing.T) {
 
 func TestRenderRemoteDirectoryAndEscapedID(t *testing.T) {
 	for _, base := range []string{"https://example.com/space%20name/experiments", "https://example.com/space%20name/experiments/"} {
-		records := []experiment.Record{{ID: "trial ?#% 雪", Title: "Trial", CreatedAt: time.Now()}}
-		body, err := web.Render(records, web.PageOptions{RemoteURL: base})
-		if err != nil {
-			t.Fatal(err)
-		}
-		want := `href="https://example.com/space%20name/experiments/trial%20%3F%23%25%20%E9%9B%AA"`
-		if strings.Count(string(body), want) != 2 {
-			t.Fatalf("expected escaped link in both list and graph: %s", want)
-		}
-		if strings.Contains(string(body), `class="branch"`) {
-			t.Fatal("inferred branch badge")
+		for _, tt := range []struct{ id, escaped string }{
+			{"trial ?#% 雪", "trial%20%3F%23%25%20%E9%9B%AA"},
+			{"2026-10-06/trial ?#% 雪", "2026-10-06/trial%20%3F%23%25%20%E9%9B%AA"},
+			{"group ?#% 雪/trial ?#% 雪", "group%20%3F%23%25%20%E9%9B%AA/trial%20%3F%23%25%20%E9%9B%AA"},
+		} {
+			records := []experiment.Record{{ID: tt.id, Title: "Trial", CreatedAt: time.Now()}}
+			body, err := web.Render(records, web.PageOptions{RemoteURL: base})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := `href="https://example.com/space%20name/experiments/` + tt.escaped + `"`
+			if strings.Count(string(body), want) != 2 {
+				t.Fatalf("expected escaped link in both list and graph: %s", want)
+			}
+			if strings.Contains(string(body), `class="branch"`) {
+				t.Fatal("inferred branch badge")
+			}
 		}
 	}
 }

@@ -27,14 +27,14 @@ func TestDiscoveryOnlyReadsSidecars(t *testing.T) {
 		t.Fatal(err)
 	}
 	// ExpLedger metadata can be read without any README or notes convention.
-	records, err := List(root)
+	records, err := List(root, Layout{})
 	if err != nil || len(records) != 1 || records[0].ID != "ours" {
 		t.Fatalf("List = %+v, %v; want only ours", records, err)
 	}
-	if _, err := Read(root, "ours"); err != nil {
+	if _, err := Read(root, "ours", Layout{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Read(root, "legacy"); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
+	if _, err := Read(root, "legacy", Layout{}); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
 		t.Fatalf("legacy read = %v; want missing sidecar", err)
 	}
 }
@@ -48,7 +48,7 @@ func TestDiscoveryRejectsBrokenSidecarLink(t *testing.T) {
 	if err := os.Symlink("absent.yaml", filepath.Join(dir, "experiment.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := List(root); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
+	if _, err := List(root, Layout{}); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
 		t.Fatalf("List = %v; want error for present broken sidecar", err)
 	}
 }

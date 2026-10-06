@@ -15,11 +15,11 @@ func TestServeCLIOverridesPersistAcrossPolls(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "root")
 	other := filepath.Join(base, "other")
-	sourceProject(t, root, "sources: [../missing]\nremote_url: https://local.example/experiments")
-	sourceProject(t, other, "remote_url: https://other.example/experiments")
-	sourceRecord(t, root, "same", "Local winner", "")
-	sourceRecord(t, other, "same", "Other loser", "")
-	sourceRecord(t, other, "unique", "Unique other", "")
+	sourceProject(t, root, "sources: [../missing]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{slug}'\nremote_url: https://local.example/experiments")
+	sourceProject(t, other, "experiments_dir: remote/trials\nexperiment_format: '{date}/{time}/{slug}'\nremote_url: https://other.example/experiments")
+	sourceRecordIn(t, root, "local/trials", "2026-10-06/same", "Local winner", "")
+	sourceRecordIn(t, other, "remote/trials", "2026-10-06/same", "Other loser", "")
+	sourceRecordIn(t, other, "remote/trials", "2026-10-06/unique", "Unique other", "")
 	nested := filepath.Join(root, "nested", "deep")
 	if err := os.MkdirAll(nested, 0755); err != nil {
 		t.Fatal(err)
@@ -65,18 +65,18 @@ func TestServeCLIOverridesPersistAcrossPolls(t *testing.T) {
 	assertSnapshot := func(path, localURL string) {
 		t.Helper()
 		status, body := poll(path)
-		if status != 200 || !strings.Contains(body, "Local winner") || strings.Contains(body, "Other loser") || !strings.Contains(body, "Unique other") || !strings.Contains(body, localURL+"/same") || !strings.Contains(body, "https://other.example/experiments/unique") {
+		if status != 200 || !strings.Contains(body, "Local winner") || strings.Contains(body, "Other loser") || !strings.Contains(body, "Unique other") || !strings.Contains(body, localURL+"/2026-10-06/same") || !strings.Contains(body, "https://other.example/experiments/2026-10-06/unique") {
 			t.Fatalf("snapshot %s: status %d, %s", path, status, body)
 		}
 	}
 	assertSnapshot("/", "https://local.example/experiments")
-	sourceProject(t, root, "sources: [../other]\nremote_url: https://changed.example/experiments")
+	sourceProject(t, root, "sources: [../other]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{slug}'\nremote_url: https://changed.example/experiments")
 	assertSnapshot("/snapshot", "https://changed.example/experiments")
-	sourceWrite(t, filepath.Join(other, "experiments", "same", "experiment.yaml"), "bad record")
+	sourceWrite(t, filepath.Join(other, "remote", "trials", "2026-10-06", "same", "experiment.yaml"), "bad record")
 	status, body := poll("/snapshot")
 	if status != 500 || strings.Contains(body, "Local winner") {
 		t.Fatalf("partial snapshot on failure: %d %s", status, body)
 	}
-	sourceRecord(t, other, "same", "Other loser", "")
+	sourceRecordIn(t, other, "remote/trials", "2026-10-06/same", "Other loser", "")
 	assertSnapshot("/snapshot", "https://changed.example/experiments")
 }
