@@ -9,13 +9,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
 
+func catalogHandler(root string, options web.PageOptions) http.Handler {
+	return web.NewLiveHandler(func() (web.Snapshot, error) {
+		records, err := catalog.List(root, catalog.Layout{})
+		return web.Snapshot{Records: records, Options: options}, err
+	})
+}
+
 func TestExperiments(t *testing.T) {
 	root := filepath.Join("..", "..", "testdata", "project")
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/research%2Fnext/experiments/"})
+	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/research%2Fnext/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK {
@@ -69,7 +77,7 @@ func TestRefreshReadsCurrentFiles(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
+	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
@@ -101,7 +109,7 @@ func TestRefreshRecoversAfterMetadataRepair(t *testing.T) {
 	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{
+	handler := catalogHandler(root, web.PageOptions{
 		Project: "Example", RemoteURL: "https://github.com/example/project/tree/main/experiments/",
 	})
 	response := httptest.NewRecorder()
@@ -128,7 +136,7 @@ func TestEmptyCatalogAndRoutes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("Private repository file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	handler := web.NewHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
+	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No experiments yet") || !strings.Contains(response.Body.String(), "expledger new my-idea") {

@@ -3,7 +3,6 @@ package web
 import (
 	"net/http"
 
-	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
 
@@ -11,14 +10,6 @@ import (
 type Snapshot struct {
 	Records []experiment.Record
 	Options PageOptions
-}
-
-// NewHandler reads the catalog on each request using fixed page options.
-func NewHandler(root string, options PageOptions) http.Handler {
-	return NewLiveHandler(func() (Snapshot, error) {
-		records, err := catalog.List(root, catalog.Layout{})
-		return Snapshot{Records: records, Options: options}, err
-	})
 }
 
 // NewLiveHandler uses the same fresh snapshot for initial pages and polling.

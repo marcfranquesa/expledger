@@ -1,11 +1,9 @@
 package catalog
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
 )
@@ -29,29 +27,6 @@ func Read(root, id string, layout Layout) (experiment.Record, error) {
 		return experiment.Record{}, err
 	}
 	return readRecord(project, layout.ExperimentsDir, id)
-}
-
-func checkExperimentDirectory(project *os.Root, directory, id string) error {
-	path := filepath.Join(directory, filepath.FromSlash(id))
-	if err := checkDirectory(project, filepath.ToSlash(path)); err != nil {
-		return fmt.Errorf("read %s: %w", filepath.Join(path, "experiment.yaml"), err)
-	}
-	return checkExperimentAncestors(project, directory, id)
-}
-
-func checkExperimentAncestors(project *os.Root, directory, id string) error {
-	parts := strings.Split(id, "/")
-	path := filepath.FromSlash(directory)
-	for _, part := range parts[:len(parts)-1] {
-		path = filepath.Join(path, part)
-		metadata := filepath.Join(path, "experiment.yaml")
-		if _, err := project.Lstat(metadata); err == nil {
-			return fmt.Errorf("%s is inside an existing experiment at %s", id, path)
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("read %s: %w", metadata, err)
-		}
-	}
-	return nil
 }
 
 func readRecord(project *os.Root, directory, id string) (experiment.Record, error) {
