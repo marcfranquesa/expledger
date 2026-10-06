@@ -10,7 +10,7 @@ with optional settings:
 
 ```yaml
 experiments_dir: experiments
-experiment_format: "{date:%Y%m%d}-{slug}"
+experiment_format: "{date:20060102}-{slug}"
 remote_url: https://github.com/owner/repo/tree/main/experiments
 sources:
   - .
@@ -46,34 +46,35 @@ existing experiments. Move their folders yourself if you want to retain them in
 the configured catalog.
 
 `experiment_format` controls IDs for `new` and defaults to
-`{date:%Y%m%d}-{slug}`. Add these placeholders wherever you want them:
+`{date:20060102}-{slug}`. Add these placeholders wherever you want them:
 
 | Placeholder | Value |
 | --- | --- |
-| `{date}` | Local date using `%Y-%m-%d`, for example `2026-10-06`. |
-| `{time}` | Local time using `%H-%M-%S`, for example `14-23-45`. |
+| `{date}` | Local date using the layout `2006-01-02`, for example `2026-10-06`. |
+| `{time}` | Local time using the layout `15-04-05`, for example `14-23-45`. |
 | `{slug}` | The positional argument to `new <slug>`, for example `baseline`. |
-| `{date:format}` or `{time:format}` | Local date/time formatted with the supplied strftime directives. |
+| `{date:format}` or `{time:format}` | Local date/time formatted with the supplied Go time layout. |
 
-Custom formats use standard strftime directives: `%Y` for the year, `%m` for the
-month, `%d` for the day, `%H` for the hour (24-hour clock), `%M` for the minute,
-`%S` for the second, and `%%` for a literal percent sign. See the
-[supported conversion specifications](https://github.com/lestrrat-go/strftime#supported-conversion-specifications)
-for the full list. Only the text inside date/time placeholders is interpreted
-as a format. Literal text outside placeholders stays unchanged, so
+Custom formats use native Go `time.Time.Format` layouts, expressed with the
+reference time: `2006` for the year, `01` for the month, `02` for the day,
+`15` for the hour (24-hour clock), `04` for the minute, and `05` for the second.
+See the [Go time layout documentation](https://pkg.go.dev/time#Time.Format)
+for the full syntax. Unrecognized layout text remains literal. Only the text
+inside date/time placeholders is interpreted as a layout. Literal text outside
+placeholders stays unchanged, so
 `baseline-2006-{slug}` retains the literal `2006`.
 
 Placeholders can repeat or be omitted, allowing slug-only, time-only, and literal
-IDs. Unknown placeholders or conversion directives, unmatched or malformed braces,
+IDs. Unknown placeholders, unmatched or malformed braces,
 `{slug:format}`, and empty formats such as `{date:}` are rejected.
 
 | `experiment_format` | Example ID for `new baseline` at 14:23:45 on October 6, 2026 |
 | --- | --- |
-| `{date:%Y%m%d}-{slug}` | `20261006-baseline` |
+| `{date:20060102}-{slug}` | `20261006-baseline` |
 | `{date}/{slug}` | `2026-10-06/baseline` |
 | `{date}/{time}-{slug}` | `2026-10-06/14-23-45-baseline` |
-| `{date:%Y-%m-%d}/{time:%H:%M}-{slug}` | `2026-10-06/14:23-baseline` |
-| `{time:%S:%M:%H}-{slug}` | `45:23:14-baseline` |
+| `{date:2006-01-02}/{time:15:04}-{slug}` | `2026-10-06/14:23-baseline` |
+| `{time:05:04:15}-{slug}` | `45:23:14-baseline` |
 | `{date}/{time}` | `2026-10-06/14-23-45` |
 | `baseline-2006-{slug}` | `baseline-2006-baseline` |
 

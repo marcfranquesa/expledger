@@ -13,7 +13,7 @@ import (
 
 func TestLayoutDefaults(t *testing.T) {
 	got := (Layout{}).WithDefaults()
-	want := Layout{ExperimentsDir: "experiments", ExperimentFormat: "{date:%Y%m%d}-{slug}"}
+	want := Layout{ExperimentsDir: "experiments", ExperimentFormat: "{date:20060102}-{slug}"}
 	if got != want {
 		t.Fatalf("default layout = %+v, want %+v", got, want)
 	}
@@ -27,13 +27,13 @@ func TestLayoutValidation(t *testing.T) {
 	for _, layout := range []Layout{
 		{},
 		{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{slug}"},
-		{ExperimentFormat: "{date}/{time:%S:%M:%H}-{slug}"},
-		{ExperimentFormat: "{date}/{time:%H:%M:%S}"},
-		{ExperimentFormat: "{date}/{time:%H:%M}"},
+		{ExperimentFormat: "{date}/{time:05:04:15}-{slug}"},
+		{ExperimentFormat: "{date}/{time:15:04:05}"},
+		{ExperimentFormat: "{date}/{time:15:04}"},
 		{ExperimentFormat: "{date}/{time}-{slug}"},
-		{ExperimentFormat: "{date:%Y/%m/%d}/{slug}"},
-		{ExperimentFormat: "{date:%F}/{time:%R}-{time:%T}-{slug}"},
-		{ExperimentFormat: "percent-{date:%Y%%}-{slug}"},
+		{ExperimentFormat: "{date:2006/01/02}/{slug}"},
+		{ExperimentFormat: "{date:2006-01-02}/{time:15:04}-{time:15:04:05}-{slug}"},
+		{ExperimentFormat: "percent-{date:2006%}-{slug}"},
 		{ExperimentFormat: "{slug}/{date}/{slug}"},
 		{ExperimentFormat: "literal-2006-15-04-05/{slug}"},
 		{ExperimentFormat: "{slug}"},
@@ -65,9 +65,8 @@ func TestLayoutValidation(t *testing.T) {
 	for _, format := range []string{
 		"{name}", "{unknown}", "{unknown}/{slug}", "2006-{slug", "2006-name}", "{{slug}}", "{}",
 		"{slug:2006}", "{date:}", "{time:}", "{date:{slug}}", "{time:{date}}",
-		"{date:%Y-{slug}}", "{date}/{{time}}", "{date}/{time:..}", "{time:/%H}",
-		"{date:%Y//%m}/{slug}", "{date:%Y/../%m}/{slug}", "{date: }/{slug}",
-		"{date:%q}/{slug}", "{time:%q}-{slug}", "{date:%}", "{time:%H:%M:%}",
+		"{date:2006-{slug}}", "{date}/{{time}}", "{date}/{time:..}", "{time:/15}",
+		"{date:2006//01}/{slug}", "{date:2006/../01}/{slug}", "{date: }/{slug}",
 	} {
 		t.Run(format, func(t *testing.T) {
 			layout := Layout{ExperimentFormat: format}
@@ -134,21 +133,26 @@ func TestCreateConfiguredNestedLayout(t *testing.T) {
 }
 
 func TestCreateTimeFormats(t *testing.T) {
-	now := time.Date(2026, 9, 24, 13, 14, 15, 0, time.UTC)
+	now := time.Date(2026, 9, 24, 13, 14, 15, 123456789, time.UTC)
 	for _, tt := range []struct{ format, slug, id string }{
 		{"{date}/{time}-{slug}", "baseline", "2026-09-24/13-14-15-baseline"},
-		{"{date}/{time:%S:%M:%H}-{slug}", "baseline", "2026-09-24/15:14:13-baseline"},
-		{"{date}/{time:%H:%M:%S}", "baseline", "2026-09-24/13:14:15"},
-		{"{date}/{time:%H:%M}-{slug}", "baseline", "2026-09-24/13:14-baseline"},
-		{"{date:%F}/{time:%R}-{time:%T}-{slug}", "baseline", "2026-09-24/13:14-13:14:15-baseline"},
-		{"percent-{date:%Y%%}-{slug}", "baseline", "percent-2026%-baseline"},
+		{"{date}/{time:05:04:15}-{slug}", "baseline", "2026-09-24/15:14:13-baseline"},
+		{"{date}/{time:15:04:05}", "baseline", "2026-09-24/13:14:15"},
+		{"{date}/{time:15:04}-{slug}", "baseline", "2026-09-24/13:14-baseline"},
+		{"{date:2006-01-02}/{time:15:04}-{time:15:04:05}-{slug}", "baseline", "2026-09-24/13:14-13:14:15-baseline"},
+		{"percent-{date:2006%}-{slug}", "baseline", "percent-2026%-baseline"},
+		{"{date:Jan-02-Mon}/{time:03-04-05PM}-{slug}", "baseline", "Sep-24-Thu/01-14-15PM-baseline"},
+		{"{date:2006-01-02}/{time:15-04-05.000000000}-{slug}", "baseline", "2026-09-24/13-14-15.123456789-baseline"},
+		{"{time:15-04-05Z0700}-{slug}", "baseline", "13-14-15Z-baseline"},
+		{"{date:15-04}/{time:2006-01-02}-{slug}", "baseline", "13-14/2026-09-24-baseline"},
+		{"{date:literal}/{time:literal%}-{slug}", "baseline", "literal/literal%-baseline"},
 		{"{date}/{slug}", "2006-15-04-05", "2026-09-24/2006-15-04-05"},
-		{"{date:%Y%m%d}-{slug}", "baseline", "20260924-baseline"},
-		{"{date:%Y/%m/%d}/{slug}", "baseline", "2026/09/24/baseline"},
+		{"{date:20060102}-{slug}", "baseline", "20260924-baseline"},
+		{"{date:2006/01/02}/{slug}", "baseline", "2026/09/24/baseline"},
 		{"2006-15-04-05/{date}-{slug}", "baseline", "2006-15-04-05/2026-09-24-baseline"},
 		{"2006-15-04-05-{slug}", "2006-15-04-05", "2006-15-04-05-2006-15-04-05"},
 		{"{slug}/{date}/{slug}", "baseline", "baseline/2026-09-24/baseline"},
-		{"{date}/{date:%Y%m%d}-{time}/{time:%S:%M:%H}-{slug}", "baseline", "2026-09-24/20260924-13-14-15/15:14:13-baseline"},
+		{"{date}/{date:20060102}-{time}/{time:05:04:15}-{slug}", "baseline", "2026-09-24/20260924-13-14-15/15:14:13-baseline"},
 		{"2006-01-02/15:04:05", "baseline", "2006-01-02/15:04:05"},
 		{"literal-%Y-%%/{date}-{slug}", "baseline", "literal-%Y-%%/2026-09-24-baseline"},
 	} {

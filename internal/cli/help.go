@@ -11,11 +11,14 @@ const newDescription = "Create an experiment folder, metadata, README, and run.s
 
 const newDetails = `Create experiment.yaml, README.md, and executable run.sh in a new experiment folder.
 Configure experiments_dir and experiment_format in the project expledger.yaml.
-Defaults are experiments/ and {date:%Y%m%d}-{slug}, producing experiments/YYYYMMDD-SLUG/.
+Defaults are experiments/ and {date:20060102}-{slug}, producing experiments/YYYYMMDD-SLUG/.
 Use {date}/{slug} for date folders or {date}/{time}-{slug} for timestamps.
 {date} inserts the local YYYY-MM-DD date, {time} the local HH-MM-SS time,
-and {slug} the positional slug. Customize with strftime directives, such as {time:%H:%M}
-for hours:minutes or {time:%S:%M:%H} for seconds:minutes:hours.
+and {slug} the positional slug. Customize with native Go time.Time.Format layouts:
+2006 for the year, 01 for the month, 02 for the day, 15 for the hour (24-hour clock),
+04 for the minute, and 05 for the second. Use {time:15:04} for hours:minutes or
+{time:05:04:15} for seconds:minutes:hours. Unrecognized layout text remains literal.
+See https://pkg.go.dev/time#Time.Format for the reference-time layout syntax.
 Literal text is unchanged. Placeholders can repeat or be omitted.
 Slugs contain lowercase letters, digits, and single hyphens between words.
 Existing experiments are never overwritten.
