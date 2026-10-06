@@ -81,7 +81,7 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 		mode os.FileMode
 	}{
 		{"README.md", []byte(fmt.Sprintf("# %s\n\n## Hypothesis\n\n## Method\n\n## Finding\n", title)), 0644},
-		{"run.sh", []byte("#!/bin/sh\nprintf '%s\\n' 'Configure run.sh with the experiment command and fixed parameters.' >&2\nexit 1\n"), 0755},
+		{"run.sh", []byte("#!/bin/sh\n# expledger run executes this file.\nprintf '%s\\n' 'Configure run.sh with the experiment command and fixed parameters.' >&2\nexit 1\n"), 0755},
 		{"experiment.yaml", data, 0644},
 	} {
 		path := filepath.Join(dir, file.name)
