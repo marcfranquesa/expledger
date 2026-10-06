@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/marcfranquesa/expledger/internal/web"
 )
 
 func sourceProject(t *testing.T, root, config string) {
@@ -54,7 +58,7 @@ func TestServeSourcesUseEachProjectLayout(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	snapshot, err := loadServeSnapshot(root, nil)
+	snapshot, err := loadSnapshot(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,12 +69,12 @@ func TestServeSourcesUseEachProjectLayout(t *testing.T) {
 		t.Fatalf("remote URLs = %+v", snapshot.Options.RemoteURLs)
 	}
 	sourceProject(t, other, "experiments_dir: missing/trials\n")
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err != nil || len(snapshot.Records) != 1 || snapshot.Records[0].ID != "2026-10-06/trial" {
 		t.Fatalf("refreshed layout: %+v, %v", snapshot, err)
 	}
 	sourceProject(t, other, "experiments_dir: ../trials\n")
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err == nil || len(snapshot.Records) != 0 {
 		t.Fatalf("invalid source layout: %+v, %v", snapshot, err)
 	}
@@ -103,7 +107,7 @@ func TestServeSourcesFirstWinnerAndRefresh(t *testing.T) {
 	sourceRecord(t, root, "same", "First", "first-parent")
 	sourceRecord(t, other, "same", "Second", "second-parent")
 	sourceRecord(t, other, "unique", "Other", "")
-	snapshot, err := loadServeSnapshot(root, nil)
+	snapshot, err := loadSnapshot(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,24 +115,24 @@ func TestServeSourcesFirstWinnerAndRefresh(t *testing.T) {
 		t.Fatalf("snapshot: %+v", snapshot)
 	}
 	sourceProject(t, root, "sources: [../other, .]")
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err != nil || snapshot.Records[0].Title != "Second" || snapshot.Options.RemoteURLs["same"] != "https://second.example/experiments" {
 		t.Fatalf("reordered: %+v, %v", snapshot, err)
 	}
 	if err := os.RemoveAll(filepath.Join(other, "experiments", "same")); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err != nil || len(snapshot.Records) != 2 || snapshot.Records[1].Title != "First" || snapshot.Options.RemoteURLs["same"] != "" {
 		t.Fatalf("fallback: %+v, %v", snapshot, err)
 	}
 	sourceRecord(t, other, "same", "Edited", "")
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err != nil || snapshot.Records[0].Title != "Edited" {
 		t.Fatalf("edited: %+v, %v", snapshot, err)
 	}
 	sourceWrite(t, filepath.Join(root, "experiments", "same", "experiment.yaml"), "invalid")
-	snapshot, err = loadServeSnapshot(root, nil)
+	snapshot, err = loadSnapshot(root, nil)
 	if err == nil || len(snapshot.Records) != 0 {
 		t.Fatalf("invalid losing duplicate must fail whole snapshot: %+v, %v", snapshot, err)
 	}
@@ -142,7 +146,7 @@ func TestServeSourcesDefaultOverrideAndLiteralPaths(t *testing.T) {
 	sourceProject(t, other, "{}")
 	sourceRecord(t, root, "local", "Local", "")
 	sourceRecord(t, other, "remote", "Remote", "")
-	snapshot, err := loadServeSnapshot(root, nil)
+	snapshot, err := loadSnapshot(root, nil)
 	if err != nil || len(snapshot.Records) != 1 || snapshot.Records[0].ID != "local" {
 		t.Fatalf("default: %+v, %v", snapshot, err)
 	}
@@ -155,35 +159,35 @@ func TestServeSourcesDefaultOverrideAndLiteralPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, override := range [][]string{{"../other"}, {other}, {"../other", "."}} {
-		snapshot, err = loadServeSnapshot(discovered, override)
+		snapshot, err = loadSnapshot(discovered, override)
 		if err != nil || snapshot.Records[0].ID != "remote" || len(snapshot.Records) != len(override) {
 			t.Fatalf("override %v: %+v, %v", override, snapshot, err)
 		}
 	}
 	sourceProject(t, root, "sources: [../missing]\nremote_url: https://updated.example/experiments")
-	snapshot, err = loadServeSnapshot(root, []string{"."})
+	snapshot, err = loadSnapshot(root, []string{"."})
 	if err != nil || snapshot.Options.RemoteURLs["local"] != "https://updated.example/experiments" {
 		t.Fatalf("override reread: %+v, %v", snapshot, err)
 	}
 	for _, literal := range []string{"~/literal", "$HOME/literal"} {
 		sourceProject(t, filepath.Join(root, literal), "{}")
 		sourceRecord(t, filepath.Join(root, literal), "literal", "Literal", "")
-		snapshot, err = loadServeSnapshot(root, []string{literal})
+		snapshot, err = loadSnapshot(root, []string{literal})
 		if err != nil || len(snapshot.Records) != 1 || snapshot.Records[0].ID != "literal" {
 			t.Fatalf("literal %s: %+v, %v", literal, snapshot, err)
 		}
 	}
-	if _, err := loadServeSnapshot(root, []string{}); err == nil {
+	if _, err := loadSnapshot(root, []string{}); err == nil {
 		t.Fatal("accepted explicit empty override")
 	}
 	for _, invalid := range []string{"", " ", "../missing", "nested"} {
-		snapshot, err = loadServeSnapshot(root, []string{invalid})
+		snapshot, err = loadSnapshot(root, []string{invalid})
 		if err == nil || len(snapshot.Records) != 0 {
 			t.Fatalf("accepted invalid %q: %+v", invalid, snapshot)
 		}
 	}
 	sourceWrite(t, filepath.Join(other, "expledger.yaml"), "unknown: true")
-	if _, err = loadServeSnapshot(root, []string{other}); err == nil || !strings.Contains(err.Error(), other) {
+	if _, err = loadSnapshot(root, []string{other}); err == nil || !strings.Contains(err.Error(), other) {
 		t.Fatalf("invalid source config: %v", err)
 	}
 }
@@ -262,7 +266,7 @@ func TestServeSourceFilesystemFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			snapshot, err := loadServeSnapshot(root, []string{".", other})
+			snapshot, err := loadSnapshot(root, []string{".", other})
 			if err == nil || len(snapshot.Records) != 0 {
 				t.Fatalf("accepted %s: %+v, %v", kind, snapshot, err)
 			}
@@ -285,11 +289,70 @@ func TestServeSourcesSortByWinningTimestamp(t *testing.T) {
 		}
 		sourceWrite(t, path, strings.ReplaceAll(string(data), "2026-10-01", date))
 	}
-	snapshot, err := loadServeSnapshot(root, []string{".", other})
+	snapshot, err := loadSnapshot(root, []string{".", other})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(snapshot.Records) != 2 || snapshot.Records[0].ID != "unique" || snapshot.Records[1].Title != "First copy" {
 		t.Fatalf("want newer unique before older winning copy: %+v", snapshot.Records)
+	}
+}
+
+func TestRefreshReadsCurrentFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
+		t.Fatal(err)
+	}
+	sourceProject(t, root, "remote_url: https://github.com/example/project/tree/main/experiments/")
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) { return loadSnapshot(root, nil) })
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
+		t.Fatalf("initial response: %d %s", response.Code, response.Body)
+	}
+	metadata := filepath.Join(root, "experiments", "20260924-baseline", "experiment.yaml")
+	data, err := os.ReadFile(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "title: Baseline model", "title: Updated baseline", 1)
+	if err := os.WriteFile(metadata, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Updated baseline") || strings.Contains(response.Body.String(), "Baseline model") {
+		t.Fatalf("refresh did not reflect changed files: %d %s", response.Code, response.Body)
+	}
+}
+
+func TestRefreshRecoversAfterMetadataRepair(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "experiments", "example")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(dir, "experiment.yaml")
+	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sourceProject(t, root, "remote_url: https://github.com/example/project/tree/main/experiments/")
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) { return loadSnapshot(root, nil) })
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "experiment.yaml") {
+		t.Fatalf("invalid metadata response: %d %s", response.Code, response.Body)
+	}
+	if response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("invalid metadata response may be cached")
+	}
+	content := "schema: expledger/v1\nid: example\ntitle: Repaired example\ncreated_at: 2026-09-24T12:00:00Z\n"
+	if err := os.WriteFile(metadata, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Repaired example") {
+		t.Fatalf("repaired metadata response: %d %s", response.Code, response.Body)
 	}
 }

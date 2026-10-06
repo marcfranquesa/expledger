@@ -1,0 +1,11 @@
+[data-chart-type="line"] .chart-series { stroke: var(--series-color); stroke-dasharray: var(--series-dash); stroke-width: 2; fill: none; vector-effect: non-scaling-stroke; }
+[data-chart-type="line"] .chart-dot { fill: var(--series-color); stroke: white; stroke-width: 1; }
+[data-chart-type="line"] .chart-crosshair { stroke: var(--chart-crosshair); stroke-width: 1; stroke-dasharray: 3 3; }
+[data-chart-type="line"] .series-0 { --series-dash: none; }
+[data-chart-type="line"] .series-1 { --series-dash: 7 3; }
+[data-chart-type="line"] .series-2 { --series-dash: 2 3; }
+[data-chart-type="line"] .series-3 { --series-dash: 9 3 2 3; }
+[data-chart-type="line"] .series-4 { --series-dash: 12 4; }
+[data-chart-type="line"] .series-5 { --series-dash: 4 3; }
+[data-chart-type="line"] .series-6 { --series-dash: 9 3 2 3 2 3; }
+[data-chart-type="line"] .series-7 { --series-dash: 2 2 7 2; }

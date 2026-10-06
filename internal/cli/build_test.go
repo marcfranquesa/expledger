@@ -1,4 +1,4 @@
-package cli_test
+package cli
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/marcfranquesa/expledger/internal/catalog"
-	"github.com/marcfranquesa/expledger/internal/cli"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
 
@@ -21,17 +20,14 @@ func TestBuildSnapshot(t *testing.T) {
 	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
 		t.Fatal(err)
 	}
-	initProject(t, root)
+	sourceProject(t, root, "remote_url: https://github.com/example/expledger-preview/tree/preview/experiments")
 
 	cwd := filepath.Join(root, "nested")
 	if err := os.Mkdir(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	options := web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/expledger-preview/tree/preview/experiments"}
-	handler := web.NewLiveHandler(func() (web.Snapshot, error) {
-		records, err := catalog.List(root, catalog.Layout{})
-		return web.Snapshot{Records: records, Options: options}, err
-	})
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) { return loadSnapshot(root, nil) })
 	renderStatic := func() []byte {
 		t.Helper()
 		records, err := catalog.List(root, catalog.Layout{})
@@ -56,7 +52,7 @@ func TestBuildSnapshot(t *testing.T) {
 			dir = filepath.Join(cwd, dir)
 		}
 		var stdout bytes.Buffer
-		if err := cli.Run(context.Background(), args, cwd, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
+		if err := Run(context.Background(), args, cwd, time.Time{}, Streams{Out: &stdout}); err != nil {
 			t.Fatal(err)
 		}
 		path := filepath.Join(dir, "index.html")
@@ -95,7 +91,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatalf("snapshot changed without a build: %v", err)
 	}
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
+	if err := Run(context.Background(), []string{"build"}, cwd, time.Time{}, Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err = os.ReadFile(path)
@@ -110,7 +106,7 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout.Reset()
-	if err := cli.Run(context.Background(), []string{"build"}, cwd, time.Time{}, cli.Streams{Out: &stdout}); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
+	if err := Run(context.Background(), []string{"build"}, cwd, time.Time{}, Streams{Out: &stdout}); err == nil || !strings.Contains(err.Error(), "experiment.yaml") {
 		t.Fatalf("invalid catalog error = %v", err)
 	}
 	if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, snapshot) || stdout.Len() != 0 {
@@ -120,10 +116,10 @@ func TestBuildSnapshot(t *testing.T) {
 
 func TestBuildEmptyAndOutputErrors(t *testing.T) {
 	root := t.TempDir()
-	initProject(t, root)
+	sourceProject(t, root, "{}")
 
 	var stdout bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{Out: &stdout}); err != nil {
+	if err := Run(context.Background(), []string{"build"}, root, time.Time{}, Streams{Out: &stdout}); err != nil {
 		t.Fatal(err)
 	}
 	if body, err := os.ReadFile(filepath.Join(root, "dist", "index.html")); err != nil || !bytes.Contains(body, []byte("No experiments yet")) {
@@ -141,7 +137,7 @@ func TestBuildEmptyAndOutputErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 		stdout.Reset()
-		err := cli.Run(context.Background(), []string{"build", "--output", dir}, root, time.Time{}, cli.Streams{Out: &stdout})
+		err := Run(context.Background(), []string{"build", "--output", dir}, root, time.Time{}, Streams{Out: &stdout})
 		if err == nil || !strings.Contains(err.Error(), want) || stdout.Len() != 0 {
 			t.Fatalf("output error = %v, stdout = %q", err, stdout.String())
 		}
@@ -158,12 +154,38 @@ func TestBuildWithoutRemoteLinks(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Setenv("PATH", t.TempDir())
-		if err := cli.Run(context.Background(), []string{"build"}, root, time.Time{}, cli.Streams{}); err != nil {
+		if err := Run(context.Background(), []string{"build"}, root, time.Time{}, Streams{}); err != nil {
 			t.Fatal(err)
 		}
 		body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
 		if err != nil || !bytes.Contains(body, []byte("Baseline model")) || bytes.Contains(body, []byte(`class="remote-link"`)) {
 			t.Fatalf("local snapshot: %v", err)
 		}
+	}
+}
+
+func TestBuildUsesLocalReportsOnly(t *testing.T) {
+	base := t.TempDir()
+	root, other := filepath.Join(base, "root"), filepath.Join(base, "other")
+	sourceProject(t, root, "sources: [../other]\nremote_url: https://local.example/experiments")
+	sourceProject(t, other, "remote_url: https://other.example/experiments")
+	sourceRecord(t, root, "local", "Local experiment", "")
+	sourceRecord(t, other, "other", "Other experiment", "")
+	writeTestReport(t, root, "local", "Local findings", "step,loss\n1,5\n")
+	sourceWrite(t, filepath.Join(other, "experiments", "other", "report.yaml"), "invalid external report")
+	if err := Run(context.Background(), []string{"build"}, root, time.Time{}, Streams{}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(root, "dist", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Local experiment", "Local findings", "https://local.example/experiments/local"} {
+		if !bytes.Contains(body, []byte(want)) {
+			t.Errorf("local build missing %q", want)
+		}
+	}
+	if bytes.Contains(body, []byte("Other experiment")) || bytes.Contains(body, []byte("https://other.example")) {
+		t.Fatal("build included a configured external source")
 	}
 }

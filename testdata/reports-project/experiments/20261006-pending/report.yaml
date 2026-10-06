@@ -1,0 +1,9 @@
+blocks:
+  - type: markdown
+    source: README.md
+
+  - type: line
+    title: Validation loss
+    source: results/metrics.csv
+    x: step
+    y: [validation_loss]

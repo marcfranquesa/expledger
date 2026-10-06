@@ -23,7 +23,7 @@ func Read(root, id string, layout Layout) (experiment.Record, error) {
 		return experiment.Record{}, fmt.Errorf("open project directory: %w", err)
 	}
 	defer project.Close()
-	if err := checkExperimentDirectory(project, layout.ExperimentsDir, id); err != nil {
+	if err := CheckExperimentDirectories(project, layout.ExperimentsDir, []string{id}); err != nil {
 		return experiment.Record{}, err
 	}
 	return readRecord(project, layout.ExperimentsDir, id)

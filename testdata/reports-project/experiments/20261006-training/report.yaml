@@ -1,0 +1,20 @@
+blocks:
+  - type: markdown
+    source: introduction.md
+
+  - type: row
+    blocks:
+      - type: line
+        title: Training loss
+        source: results/metrics.csv
+        x: step
+        y: [train_loss, validation_loss]
+
+      - type: line
+        title: Throughput
+        source: results/metrics.csv
+        x: step
+        y: [tokens_per_second]
+
+  - type: markdown
+    source: conclusions.md

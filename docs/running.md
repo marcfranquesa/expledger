@@ -49,6 +49,10 @@ The runner does not create checkouts, copy files, or relocate outputs.
 See the [CLI reference](https://marcfranquesa.github.io/expledger/docs/reference/expledger/) for commands
 and flags, and [Experiment format](format.md) for metadata and filesystem rules.
 
+Experiments can also declare [reports](reports.md) with local Markdown and CSV
+results. Both `build` and `serve` include those reports; `serve` refreshes their
+layout, prose, and data alongside the catalog.
+
 ## Experiment graph
 
 Choose **Graph** in either `build` or `serve` to explore `based_on` lineage.
