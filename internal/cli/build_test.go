@@ -28,7 +28,10 @@ func TestBuildSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	options := web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/expledger-preview/tree/preview/experiments"}
-	handler := web.NewHandler(root, options)
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) {
+		records, err := catalog.List(root, catalog.Layout{})
+		return web.Snapshot{Records: records, Options: options}, err
+	})
 	renderStatic := func() []byte {
 		t.Helper()
 		records, err := catalog.List(root, catalog.Layout{})

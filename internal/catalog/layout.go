@@ -2,9 +2,6 @@ package catalog
 
 import (
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -28,7 +25,7 @@ func (l Layout) WithDefaults() Layout {
 	return l
 }
 
-// Validate requires project-relative paths and explicit slug, date, and time placeholders.
+// Validate checks project-relative paths and formats with optional slug, date, and time placeholders.
 func (l Layout) Validate() error {
 	l = l.WithDefaults()
 	if !validRelativePath(l.ExperimentsDir) {
@@ -87,60 +84,4 @@ func formatExperimentID(format, slug string, now time.Time) (string, error) {
 		format = rest
 	}
 	return result.String(), nil
-}
-
-func validRelativePath(value string) bool {
-	if value == "." || !fs.ValidPath(value) || !filepath.IsLocal(filepath.FromSlash(value)) || strings.ContainsAny(value, "\\\x00") {
-		return false
-	}
-	for _, part := range strings.Split(value, "/") {
-		if strings.TrimSpace(part) == "" {
-			return false
-		}
-	}
-	return true
-}
-
-func validateID(id string) error {
-	if !validRelativePath(id) {
-		return fmt.Errorf("invalid experiment ID %q: use a nonempty relative path without dot segments, backslashes, or empty components", id)
-	}
-	// A directory named like a sidecar would make its grouping parent an experiment.
-	for _, part := range strings.Split(id, "/")[1:] {
-		if strings.EqualFold(part, "experiment.yaml") {
-			return fmt.Errorf("invalid experiment ID %q: experiment.yaml is reserved for metadata inside grouping directories", id)
-		}
-	}
-	return nil
-}
-
-// checkDirectory rejects symlink components and checks the spelling of each entry.
-func checkDirectory(project *os.Root, directory string) error {
-	parent := "."
-	for _, component := range strings.Split(directory, "/") {
-		path := filepath.Join(parent, component)
-		info, err := project.Lstat(path)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("%s must be a directory, not a file or symlink", path)
-		}
-		entries, err := fs.ReadDir(project.FS(), filepath.ToSlash(parent))
-		if err != nil {
-			return err
-		}
-		found := false
-		for _, entry := range entries {
-			if entry.Name() == component {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("read %s: %w", path, os.ErrNotExist)
-		}
-		parent = path
-	}
-	return nil
 }
