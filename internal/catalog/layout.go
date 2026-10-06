@@ -23,18 +23,18 @@ func (l Layout) WithDefaults() Layout {
 		l.ExperimentsDir = "experiments"
 	}
 	if l.ExperimentFormat == "" {
-		l.ExperimentFormat = "{date:%Y%m%d}-{name}"
+		l.ExperimentFormat = "{date:%Y%m%d}-{slug}"
 	}
 	return l
 }
 
-// Validate requires project-relative paths and explicit name, date, and time placeholders.
+// Validate requires project-relative paths and explicit slug, date, and time placeholders.
 func (l Layout) Validate() error {
 	l = l.WithDefaults()
 	if !validRelativePath(l.ExperimentsDir) {
 		return fmt.Errorf("experiments_dir must be a nonempty relative path without dot segments, backslashes, or empty components")
 	}
-	id, err := formatExperimentID(l.ExperimentFormat, "name", time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC))
+	id, err := formatExperimentID(l.ExperimentFormat, "slug", time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC))
 	if err != nil {
 		return fmt.Errorf("experiment_format: %w", err)
 	}
@@ -44,7 +44,7 @@ func (l Layout) Validate() error {
 	return nil
 }
 
-func formatExperimentID(format, name string, now time.Time) (string, error) {
+func formatExperimentID(format, slug string, now time.Time) (string, error) {
 	var result strings.Builder
 	for format != "" {
 		literal, remaining, found := strings.Cut(format, "{")
@@ -61,11 +61,11 @@ func formatExperimentID(format, name string, now time.Time) (string, error) {
 		}
 		key, layout, custom := strings.Cut(token, ":")
 		switch key {
-		case "name":
+		case "slug":
 			if custom {
-				return "", fmt.Errorf("{name} does not accept a format")
+				return "", fmt.Errorf("{slug} does not accept a format")
 			}
-			result.WriteString(name)
+			result.WriteString(slug)
 		case "date", "time":
 			if custom && layout == "" {
 				return "", fmt.Errorf("{%s:...} requires a nonempty strftime format", key)
@@ -82,7 +82,7 @@ func formatExperimentID(format, name string, now time.Time) (string, error) {
 			}
 			result.WriteString(value)
 		default:
-			return "", fmt.Errorf("unknown placeholder {%s}; use {name}, {date}, or {time}", token)
+			return "", fmt.Errorf("unknown placeholder {%s}; use {slug}, {date}, or {time}", token)
 		}
 		format = rest
 	}

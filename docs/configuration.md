@@ -10,7 +10,7 @@ with optional settings:
 
 ```yaml
 experiments_dir: experiments
-experiment_format: "{date:%Y%m%d}-{name}"
+experiment_format: "{date:%Y%m%d}-{slug}"
 remote_url: https://github.com/owner/repo/tree/main/experiments
 sources:
   - .
@@ -46,13 +46,13 @@ existing experiments. Move their folders yourself if you want to retain them in
 the configured catalog.
 
 `experiment_format` controls IDs for `new` and defaults to
-`{date:%Y%m%d}-{name}`. Add these placeholders wherever you want them:
+`{date:%Y%m%d}-{slug}`. Add these placeholders wherever you want them:
 
 | Placeholder | Value |
 | --- | --- |
 | `{date}` | Local date using `%Y-%m-%d`, for example `2026-10-06`. |
 | `{time}` | Local time using `%H-%M-%S`, for example `14-23-45`. |
-| `{name}` | The command's slug, for example `baseline`. |
+| `{slug}` | The positional argument to `new <slug>`, for example `baseline`. |
 | `{date:format}` or `{time:format}` | Local date/time formatted with the supplied strftime directives. |
 
 Custom formats use standard strftime directives: `%Y` for the year, `%m` for the
@@ -61,27 +61,27 @@ month, `%d` for the day, `%H` for the hour (24-hour clock), `%M` for the minute,
 [supported conversion specifications](https://github.com/lestrrat-go/strftime#supported-conversion-specifications)
 for the full list. Only the text inside date/time placeholders is interpreted
 as a format. Literal text outside placeholders stays unchanged, so
-`baseline-2006-{name}` retains the literal `2006`.
+`baseline-2006-{slug}` retains the literal `2006`.
 
-Placeholders can repeat or be omitted, allowing name-only, time-only, and literal
+Placeholders can repeat or be omitted, allowing slug-only, time-only, and literal
 IDs. Unknown placeholders or conversion directives, unmatched or malformed braces,
-`{name:format}`, and empty formats such as `{date:}` are rejected.
+`{slug:format}`, and empty formats such as `{date:}` are rejected.
 
 | `experiment_format` | Example ID for `new baseline` at 14:23:45 on October 6, 2026 |
 | --- | --- |
-| `{date:%Y%m%d}-{name}` | `20261006-baseline` |
-| `{date}/{name}` | `2026-10-06/baseline` |
-| `{date}/{time}-{name}` | `2026-10-06/14-23-45-baseline` |
-| `{date:%Y-%m-%d}/{time:%H:%M}-{name}` | `2026-10-06/14:23-baseline` |
-| `{time:%S:%M:%H}-{name}` | `45:23:14-baseline` |
+| `{date:%Y%m%d}-{slug}` | `20261006-baseline` |
+| `{date}/{slug}` | `2026-10-06/baseline` |
+| `{date}/{time}-{slug}` | `2026-10-06/14-23-45-baseline` |
+| `{date:%Y-%m-%d}/{time:%H:%M}-{slug}` | `2026-10-06/14:23-baseline` |
+| `{time:%S:%M:%H}-{slug}` | `45:23:14-baseline` |
 | `{date}/{time}` | `2026-10-06/14-23-45` |
-| `baseline-2006-{name}` | `baseline-2006-baseline` |
+| `baseline-2006-{slug}` | `baseline-2006-baseline` |
 
 For example, customize both settings in the root `expledger.yaml`:
 
 ```yaml
 experiments_dir: research/trials
-experiment_format: "{date}/{time}-{name}"
+experiment_format: "{date}/{time}-{slug}"
 ```
 
 This creates `research/trials/2026-10-06/14-23-45-baseline/`. Its ID is

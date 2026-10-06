@@ -46,7 +46,7 @@ func sourceRecordIn(t *testing.T, root, experimentsDir, id, title, parent string
 func TestServeSourcesUseEachProjectLayout(t *testing.T) {
 	base := t.TempDir()
 	root, other := filepath.Join(base, "root"), filepath.Join(base, "other")
-	sourceProject(t, root, "sources: [., ../other]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{name}'\nremote_url: https://first.example/local/trials")
+	sourceProject(t, root, "sources: [., ../other]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{slug}'\nremote_url: https://first.example/local/trials")
 	sourceProject(t, other, "experiments_dir: remote/trials\nexperiment_format: '{date}/{time:%H:%M:%S}'\nremote_url: https://second.example/remote/trials")
 	now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.UTC)
 	for _, source := range []string{root, other} {

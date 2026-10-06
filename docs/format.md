@@ -46,8 +46,8 @@ are unsupported, including within custom metadata.
 ## IDs and creation
 
 By default, `new <slug>` generates `YYYYMMDD-<slug>` using the local date. Configure
-`experiment_format` with `{date}`, `{time}`, and `{name}` placeholders to use
-other dates, timestamps, or nested paths, such as `{date}/{time}-{name}`. Slugs use lowercase
+`experiment_format` with `{date}`, `{time}`, and `{slug}` placeholders to use
+other dates, timestamps, or nested paths, such as `{date}/{time}-{slug}`. Slugs use lowercase
 ASCII letters, digits, and single hyphens between words. New records store
 `created_at` in UTC, so its UTC date can differ from the date in the ID.
 

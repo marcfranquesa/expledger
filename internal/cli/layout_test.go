@@ -16,7 +16,7 @@ import (
 
 func TestCustomLayoutCommands(t *testing.T) {
 	root := t.TempDir()
-	config := "experiments_dir: research/trials\nexperiment_format: '{date}/{name}'\nremote_url: https://example.com/research/trials\n"
+	config := "experiments_dir: research/trials\nexperiment_format: '{date}/{slug}'\nremote_url: https://example.com/research/trials\n"
 	if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -94,9 +94,9 @@ func TestCustomLayoutDateAndTimePlaceholders(t *testing.T) {
 		id     string
 	}{
 		{"{date}/{time}", "2026-10-06/18-17-16"},
-		{"{date:%Y%m%d}/{time:%H:%M}-{name}", "20261006/18:17-trial"},
+		{"{date:%Y%m%d}/{time:%H:%M}-{slug}", "20261006/18:17-trial"},
 		{"{date}/{time:%S:%M:%H}", "2026-10-06/16:17:18"},
-		{"2006-01-02/{name}", "2006-01-02/trial"},
+		{"2006-01-02/{slug}", "2006-01-02/trial"},
 	} {
 		t.Run(tt.format, func(t *testing.T) {
 			root := t.TempDir()
@@ -132,20 +132,20 @@ func TestLayoutConfigRejectsInvalidValues(t *testing.T) {
 		"experiments_dir: /tmp/trials", "experiments_dir: ../trials",
 		"experiments_dir: .", "experiments_dir: research/../trials",
 		"experiments_dir: 'research\\trials'", "experiments_dir: '  '",
-		"experiment_format: /{name}", "experiment_format: ../{name}",
-		"experiment_format: '{date}/../{name}'", "experiment_format: '{date}\\{name}'",
-		"experiment_format: '{slug}'", "experiment_format: '  '",
-		"experiment_format: '{date}/experiment.yaml/{name}'",
+		"experiment_format: /{slug}", "experiment_format: ../{slug}",
+		"experiment_format: '{date}/../{slug}'", "experiment_format: '{date}\\{slug}'",
+		"experiment_format: '{name}'", "experiment_format: '{unknown}'", "experiment_format: '  '",
+		"experiment_format: '{date}/experiment.yaml/{slug}'",
 		"experiment_format: '{date'", "experiment_format: 'date}'",
 		"experiment_format: '{}'", "experiment_format: '{{date}}'",
-		"experiment_format: '{name:%Y}'",
+		"experiment_format: '{slug:%Y}'",
 		"experiment_format: '{date:}'", "experiment_format: '{time:}'",
 		"experiment_format: '{date:{time}}'",
-		"experiment_format: '{date:../%Y}/{name}'",
-		"experiment_format: '{time:%H\\%M}/{name}'",
+		"experiment_format: '{date:../%Y}/{slug}'",
+		"experiment_format: '{time:%H\\%M}/{slug}'",
 		"experiment_format: '{time:%q}'", "experiment_format: '{date:%}'",
 		"experiments_dir: trials\nexperiments_dir: trials",
-		"experiment_format: '{name}'\nexperiment_format: '{name}'",
+		"experiment_format: '{slug}'\nexperiment_format: '{slug}'",
 	} {
 		t.Run(config, func(t *testing.T) {
 			root := t.TempDir()

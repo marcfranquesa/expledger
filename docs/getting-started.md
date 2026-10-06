@@ -39,7 +39,7 @@ my-project/
 ```
 
 Customize the base folder with `experiments_dir` and add date/time placeholders
-with `experiment_format` in `expledger.yaml`, for example `{date}/{time}-{name}`; see
+with `experiment_format` in `expledger.yaml`, for example `{date}/{time}-{slug}`; see
 [Experiment folders and names](configuration.md#experiment-folders-and-names).
 
 Open that directory's README and describe the hypothesis and method. Replace the
