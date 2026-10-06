@@ -16,7 +16,7 @@ import (
 
 func TestCustomLayoutCommands(t *testing.T) {
 	root := t.TempDir()
-	config := "experiments_dir: research/trials\nexperiment_format: '2006-01-02/{name}'\nremote_url: https://example.com/research/trials\n"
+	config := "experiments_dir: research/trials\nexperiment_format: '{date}/{name}'\nremote_url: https://example.com/research/trials\n"
 	if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -88,23 +88,38 @@ func TestCustomLayoutCommands(t *testing.T) {
 	}
 }
 
-func TestCustomLayoutTimestampWithoutName(t *testing.T) {
-	root := t.TempDir()
-	config := "experiment_format: '2006-01-02/05:04:15'\n"
-	if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.UTC)
-	var out bytes.Buffer
-	if err := cli.Run(context.Background(), []string{"new", "trial"}, root, now, cli.Streams{Out: &out}); err != nil {
-		t.Fatal(err)
-	}
-	id := "2026-10-06/16:17:18"
-	if _, err := os.Stat(filepath.Join(root, "experiments", id, "experiment.yaml")); err != nil {
-		t.Fatal(err)
-	}
-	if err := cli.Run(context.Background(), []string{"validate", id}, root, now, cli.Streams{}); err != nil {
-		t.Fatal(err)
+func TestCustomLayoutDateAndTimePlaceholders(t *testing.T) {
+	for _, tt := range []struct {
+		format string
+		id     string
+	}{
+		{"{date}/{time}", "2026-10-06/18-17-16"},
+		{"{date:%Y%m%d}/{time:%H:%M}-{name}", "20261006/18:17-trial"},
+		{"{date}/{time:%S:%M:%H}", "2026-10-06/16:17:18"},
+		{"2006-01-02/{name}", "2006-01-02/trial"},
+	} {
+		t.Run(tt.format, func(t *testing.T) {
+			root := t.TempDir()
+			config := "experiment_format: '" + tt.format + "'\n"
+			if err := os.WriteFile(filepath.Join(root, "expledger.yaml"), []byte(config), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			now := time.Date(2026, 10, 6, 18, 17, 16, 0, time.UTC)
+			var out bytes.Buffer
+			if err := cli.Run(context.Background(), []string{"new", "trial"}, root, now, cli.Streams{Out: &out}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "experiments", tt.id, "experiment.yaml")); err != nil {
+				t.Fatal(err)
+			}
+			if err := cli.Run(context.Background(), []string{"validate", tt.id}, root, now, cli.Streams{}); err != nil {
+				t.Fatal(err)
+			}
+			out.Reset()
+			if err := cli.Run(context.Background(), []string{"list"}, root, now, cli.Streams{Out: &out}); err != nil || !strings.Contains(out.String(), tt.id) {
+				t.Fatalf("list = %q, %v", &out, err)
+			}
+		})
 	}
 }
 
@@ -118,9 +133,17 @@ func TestLayoutConfigRejectsInvalidValues(t *testing.T) {
 		"experiments_dir: .", "experiments_dir: research/../trials",
 		"experiments_dir: 'research\\trials'", "experiments_dir: '  '",
 		"experiment_format: /{name}", "experiment_format: ../{name}",
-		"experiment_format: '2006/../{name}'", "experiment_format: '2006\\{name}'",
+		"experiment_format: '{date}/../{name}'", "experiment_format: '{date}\\{name}'",
 		"experiment_format: '{slug}'", "experiment_format: '  '",
-		"experiment_format: '2006/experiment.yaml/{name}'",
+		"experiment_format: '{date}/experiment.yaml/{name}'",
+		"experiment_format: '{date'", "experiment_format: 'date}'",
+		"experiment_format: '{}'", "experiment_format: '{{date}}'",
+		"experiment_format: '{name:%Y}'",
+		"experiment_format: '{date:}'", "experiment_format: '{time:}'",
+		"experiment_format: '{date:{time}}'",
+		"experiment_format: '{date:../%Y}/{name}'",
+		"experiment_format: '{time:%H\\%M}/{name}'",
+		"experiment_format: '{time:%q}'", "experiment_format: '{date:%}'",
 		"experiments_dir: trials\nexperiments_dir: trials",
 		"experiment_format: '{name}'\nexperiment_format: '{name}'",
 	} {

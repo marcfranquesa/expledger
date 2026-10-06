@@ -15,8 +15,8 @@ func TestServeCLIOverridesPersistAcrossPolls(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "root")
 	other := filepath.Join(base, "other")
-	sourceProject(t, root, "sources: [../missing]\nexperiments_dir: local/trials\nremote_url: https://local.example/experiments")
-	sourceProject(t, other, "experiments_dir: remote/trials\nremote_url: https://other.example/experiments")
+	sourceProject(t, root, "sources: [../missing]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{name}'\nremote_url: https://local.example/experiments")
+	sourceProject(t, other, "experiments_dir: remote/trials\nexperiment_format: '{date}/{time}/{name}'\nremote_url: https://other.example/experiments")
 	sourceRecordIn(t, root, "local/trials", "2026-10-06/same", "Local winner", "")
 	sourceRecordIn(t, other, "remote/trials", "2026-10-06/same", "Other loser", "")
 	sourceRecordIn(t, other, "remote/trials", "2026-10-06/unique", "Unique other", "")
@@ -70,7 +70,7 @@ func TestServeCLIOverridesPersistAcrossPolls(t *testing.T) {
 		}
 	}
 	assertSnapshot("/", "https://local.example/experiments")
-	sourceProject(t, root, "sources: [../other]\nexperiments_dir: local/trials\nremote_url: https://changed.example/experiments")
+	sourceProject(t, root, "sources: [../other]\nexperiments_dir: local/trials\nexperiment_format: '{date}/{name}'\nremote_url: https://changed.example/experiments")
 	assertSnapshot("/snapshot", "https://changed.example/experiments")
 	sourceWrite(t, filepath.Join(other, "remote", "trials", "2026-10-06", "same", "experiment.yaml"), "bad record")
 	status, body := poll("/snapshot")

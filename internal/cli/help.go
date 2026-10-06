@@ -11,9 +11,12 @@ const newDescription = "Create an experiment folder, metadata, README, and run.s
 
 const newDetails = `Create experiment.yaml, README.md, and executable run.sh in a new experiment folder.
 Configure experiments_dir and experiment_format in the project expledger.yaml.
-Defaults are experiments/ and 20060102-{name}, producing experiments/YYYYMMDD-SLUG/.
-The format uses Go time layouts in local time; {name} inserts the slug.
-Use 2006-01-02/{name} for date folders or 2006-01-02/15-04-05-{name} for timestamps.
+Defaults are experiments/ and {date:%Y%m%d}-{name}, producing experiments/YYYYMMDD-SLUG/.
+Use {date}/{name} for date folders or {date}/{time}-{name} for timestamps.
+{date} inserts the local YYYY-MM-DD date, {time} the local HH-MM-SS time,
+and {name} the slug. Customize with strftime directives, such as {time:%H:%M}
+for hours:minutes or {time:%S:%M:%H} for seconds:minutes:hours.
+Literal text is unchanged. Placeholders can repeat or be omitted.
 Slugs contain lowercase letters, digits, and single hyphens between words.
 Existing experiments are never overwritten.
 Validate only the direct parents named by --based-on. Each must have a valid

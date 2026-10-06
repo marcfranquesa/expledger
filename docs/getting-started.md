@@ -38,8 +38,8 @@ my-project/
         └── run.sh
 ```
 
-Customize the base folder and date/time layout with `experiments_dir` and
-`experiment_format` in `expledger.yaml`; see
+Customize the base folder with `experiments_dir` and add date/time placeholders
+with `experiment_format` in `expledger.yaml`, for example `{date}/{time}-{name}`; see
 [Experiment folders and names](configuration.md#experiment-folders-and-names).
 
 Open that directory's README and describe the hypothesis and method. Replace the

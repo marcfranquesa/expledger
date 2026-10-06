@@ -32,7 +32,10 @@ func Create(root, slug string, now time.Time, opts CreateOptions) (string, error
 	if !slugPattern.MatchString(slug) {
 		return "", fmt.Errorf("invalid slug %q: use lowercase letters, digits, and single hyphens", slug)
 	}
-	id := strings.ReplaceAll(now.Format(layout.ExperimentFormat), "{name}", slug)
+	id, err := formatExperimentID(layout.ExperimentFormat, slug, now)
+	if err != nil {
+		return "", fmt.Errorf("experiment_format: %w", err)
+	}
 	if err := validateID(id); err != nil {
 		return "", err
 	}

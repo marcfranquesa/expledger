@@ -10,7 +10,7 @@ with optional settings:
 
 ```yaml
 experiments_dir: experiments
-experiment_format: "20060102-{name}"
+experiment_format: "{date:%Y%m%d}-{name}"
 remote_url: https://github.com/owner/repo/tree/main/experiments
 sources:
   - .
@@ -45,26 +45,43 @@ and symlinked directories are rejected. Changing this setting does not move
 existing experiments. Move their folders yourself if you want to retain them in
 the configured catalog.
 
-`experiment_format` controls IDs for `new` and defaults to `20060102-{name}`.
-It uses the standard [Go time layout](https://pkg.go.dev/time#Time.Format) with
-local time. Write the reference date's components in the positions you want:
-`2006` is the year, `01` the month, `02` the day, `15` the hour (24-hour clock),
-`04` the minute, and `05` the second. The optional `{name}` token inserts the
-command's slug after time formatting. Other brace tokens are rejected.
+`experiment_format` controls IDs for `new` and defaults to
+`{date:%Y%m%d}-{name}`. Add these placeholders wherever you want them:
+
+| Placeholder | Value |
+| --- | --- |
+| `{date}` | Local date using `%Y-%m-%d`, for example `2026-10-06`. |
+| `{time}` | Local time using `%H-%M-%S`, for example `14-23-45`. |
+| `{name}` | The command's slug, for example `baseline`. |
+| `{date:format}` or `{time:format}` | Local date/time formatted with the supplied strftime directives. |
+
+Custom formats use standard strftime directives: `%Y` for the year, `%m` for the
+month, `%d` for the day, `%H` for the hour (24-hour clock), `%M` for the minute,
+`%S` for the second, and `%%` for a literal percent sign. See the
+[supported conversion specifications](https://github.com/lestrrat-go/strftime#supported-conversion-specifications)
+for the full list. Only the text inside date/time placeholders is interpreted
+as a format. Literal text outside placeholders stays unchanged, so
+`baseline-2006-{name}` retains the literal `2006`.
+
+Placeholders can repeat or be omitted, allowing name-only, time-only, and literal
+IDs. Unknown placeholders or conversion directives, unmatched or malformed braces,
+`{name:format}`, and empty formats such as `{date:}` are rejected.
 
 | `experiment_format` | Example ID for `new baseline` at 14:23:45 on October 6, 2026 |
 | --- | --- |
-| `20060102-{name}` | `20261006-baseline` |
-| `2006-01-02/{name}` | `2026-10-06/baseline` |
-| `2006-01-02/15-04-05-{name}` | `2026-10-06/14-23-45-baseline` |
-| `05:04:15-{name}` | `45:23:14-baseline` |
-| `2006-01-02/15-04-05` | `2026-10-06/14-23-45` |
+| `{date:%Y%m%d}-{name}` | `20261006-baseline` |
+| `{date}/{name}` | `2026-10-06/baseline` |
+| `{date}/{time}-{name}` | `2026-10-06/14-23-45-baseline` |
+| `{date:%Y-%m-%d}/{time:%H:%M}-{name}` | `2026-10-06/14:23-baseline` |
+| `{time:%S:%M:%H}-{name}` | `45:23:14-baseline` |
+| `{date}/{time}` | `2026-10-06/14-23-45` |
+| `baseline-2006-{name}` | `baseline-2006-baseline` |
 
 For example, customize both settings in the root `expledger.yaml`:
 
 ```yaml
 experiments_dir: research/trials
-experiment_format: "2006-01-02/15-04-05-{name}"
+experiment_format: "{date}/{time}-{name}"
 ```
 
 This creates `research/trials/2026-10-06/14-23-45-baseline/`. Its ID is

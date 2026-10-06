@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/lestrrat-go/strftime"
 )
 
 // Layout controls where experiments live and how new experiment IDs are named.
@@ -20,24 +23,70 @@ func (l Layout) WithDefaults() Layout {
 		l.ExperimentsDir = "experiments"
 	}
 	if l.ExperimentFormat == "" {
-		l.ExperimentFormat = "20060102-{name}"
+		l.ExperimentFormat = "{date:%Y%m%d}-{name}"
 	}
 	return l
 }
 
-// Validate requires project-relative paths and Go time layouts with an optional {name}.
+// Validate requires project-relative paths and explicit name, date, and time placeholders.
 func (l Layout) Validate() error {
 	l = l.WithDefaults()
 	if !validRelativePath(l.ExperimentsDir) {
 		return fmt.Errorf("experiments_dir must be a nonempty relative path without dot segments, backslashes, or empty components")
 	}
-	if !validRelativePath(l.ExperimentFormat) || strings.ContainsAny(strings.ReplaceAll(l.ExperimentFormat, "{name}", "name"), "{}") {
-		return fmt.Errorf("experiment_format must be a nonempty relative Go time layout; {name} is the only supported placeholder")
+	id, err := formatExperimentID(l.ExperimentFormat, "name", time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC))
+	if err != nil {
+		return fmt.Errorf("experiment_format: %w", err)
 	}
-	if err := validateID(l.ExperimentFormat); err != nil {
+	if err := validateID(id); err != nil {
 		return fmt.Errorf("experiment_format: %w", err)
 	}
 	return nil
+}
+
+func formatExperimentID(format, name string, now time.Time) (string, error) {
+	var result strings.Builder
+	for format != "" {
+		literal, remaining, found := strings.Cut(format, "{")
+		if strings.Contains(literal, "}") {
+			return "", fmt.Errorf("unmatched closing brace")
+		}
+		result.WriteString(literal)
+		if !found {
+			break
+		}
+		token, rest, closed := strings.Cut(remaining, "}")
+		if !closed || strings.Contains(token, "{") {
+			return "", fmt.Errorf("unclosed or nested placeholder")
+		}
+		key, layout, custom := strings.Cut(token, ":")
+		switch key {
+		case "name":
+			if custom {
+				return "", fmt.Errorf("{name} does not accept a format")
+			}
+			result.WriteString(name)
+		case "date", "time":
+			if custom && layout == "" {
+				return "", fmt.Errorf("{%s:...} requires a nonempty strftime format", key)
+			}
+			if !custom {
+				layout = "%Y-%m-%d"
+				if key == "time" {
+					layout = "%H-%M-%S"
+				}
+			}
+			value, err := strftime.Format(layout, now)
+			if err != nil {
+				return "", fmt.Errorf("invalid %s format %q: %w", key, layout, err)
+			}
+			result.WriteString(value)
+		default:
+			return "", fmt.Errorf("unknown placeholder {%s}; use {name}, {date}, or {time}", token)
+		}
+		format = rest
+	}
+	return result.String(), nil
 }
 
 func validRelativePath(value string) bool {

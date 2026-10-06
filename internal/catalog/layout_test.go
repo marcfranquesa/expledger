@@ -13,11 +13,11 @@ import (
 
 func TestLayoutDefaults(t *testing.T) {
 	got := (Layout{}).WithDefaults()
-	want := Layout{ExperimentsDir: "experiments", ExperimentFormat: "20060102-{name}"}
+	want := Layout{ExperimentsDir: "experiments", ExperimentFormat: "{date:%Y%m%d}-{name}"}
 	if got != want {
 		t.Fatalf("default layout = %+v, want %+v", got, want)
 	}
-	custom := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "2006-01-02/{name}"}
+	custom := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{name}"}
 	if got := custom.WithDefaults(); got != custom {
 		t.Fatalf("custom layout = %+v, want %+v", got, custom)
 	}
@@ -26,9 +26,16 @@ func TestLayoutDefaults(t *testing.T) {
 func TestLayoutValidation(t *testing.T) {
 	for _, layout := range []Layout{
 		{},
-		{ExperimentsDir: "research/trials", ExperimentFormat: "2006-01-02/{name}"},
-		{ExperimentFormat: "2006-01-02/05:04:15-{name}"},
-		{ExperimentFormat: "2006-01-02/15:04:05"},
+		{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{name}"},
+		{ExperimentFormat: "{date}/{time:%S:%M:%H}-{name}"},
+		{ExperimentFormat: "{date}/{time:%H:%M:%S}"},
+		{ExperimentFormat: "{date}/{time:%H:%M}"},
+		{ExperimentFormat: "{date}/{time}-{name}"},
+		{ExperimentFormat: "{date:%Y/%m/%d}/{name}"},
+		{ExperimentFormat: "{date:%F}/{time:%R}-{time:%T}-{name}"},
+		{ExperimentFormat: "percent-{date:%Y%%}-{name}"},
+		{ExperimentFormat: "{name}/{date}/{name}"},
+		{ExperimentFormat: "literal-2006-15-04-05/{name}"},
 		{ExperimentFormat: "{name}"},
 	} {
 		if err := layout.Validate(); err != nil {
@@ -55,15 +62,31 @@ func TestLayoutValidation(t *testing.T) {
 			})
 		}
 	}
-	for _, format := range []string{"{slug}", "{unknown}/{name}", "2006-{name", "2006-name}", "{{name}}"} {
-		if err := (Layout{ExperimentFormat: format}).Validate(); err == nil {
-			t.Errorf("invalid placeholder format %q accepted", format)
-		}
+	for _, format := range []string{
+		"{slug}", "{unknown}/{name}", "2006-{name", "2006-name}", "{{name}}", "{}",
+		"{name:2006}", "{date:}", "{time:}", "{date:{name}}", "{time:{date}}",
+		"{date:%Y-{name}}", "{date}/{{time}}", "{date}/{time:..}", "{time:/%H}",
+		"{date:%Y//%m}/{name}", "{date:%Y/../%m}/{name}", "{date: }/{name}",
+		"{date:%q}/{name}", "{time:%q}-{name}", "{date:%}", "{time:%H:%M:%}",
+	} {
+		t.Run(format, func(t *testing.T) {
+			layout := Layout{ExperimentFormat: format}
+			if err := layout.Validate(); err == nil {
+				t.Errorf("invalid placeholder format %q accepted", format)
+			}
+			root := t.TempDir()
+			if _, err := Create(root, "baseline", time.Now(), CreateOptions{Layout: layout}); err == nil {
+				t.Fatal("Create accepted invalid placeholder format")
+			}
+			if entries, err := os.ReadDir(root); err != nil || len(entries) != 0 {
+				t.Fatalf("invalid placeholder changed project: entries=%v, err=%v", entries, err)
+			}
+		})
 	}
 }
 
 func TestCreateRejectsSidecarDirectoryNamesBeforeWriting(t *testing.T) {
-	for _, format := range []string{"2006/experiment.yaml/{name}", "2006/Experiment.yaml", "2006/{name}.yaml/child"} {
+	for _, format := range []string{"{date}/experiment.yaml/{name}", "{date}/Experiment.yaml", "{date}/{name}.yaml/child"} {
 		t.Run(format, func(t *testing.T) {
 			root := t.TempDir()
 			layout := Layout{ExperimentFormat: format}
@@ -80,7 +103,7 @@ func TestCreateRejectsSidecarDirectoryNamesBeforeWriting(t *testing.T) {
 func TestCreateConfiguredNestedLayout(t *testing.T) {
 	root := t.TempDir()
 	now := time.Date(2026, 9, 24, 23, 59, 58, 123456789, time.FixedZone("local", -4*60*60))
-	layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "2006-01-02/{name}"}
+	layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{name}"}
 	dir, err := Create(root, "baseline", now, CreateOptions{Layout: layout})
 	if want := filepath.Join(root, "research", "trials", "2026-09-24", "baseline"); err != nil || dir != want {
 		t.Fatalf("Create = %q, %v; want %q", dir, err, want)
@@ -113,9 +136,21 @@ func TestCreateConfiguredNestedLayout(t *testing.T) {
 func TestCreateTimeFormats(t *testing.T) {
 	now := time.Date(2026, 9, 24, 13, 14, 15, 0, time.UTC)
 	for _, tt := range []struct{ format, slug, id string }{
-		{"2006-01-02/05:04:15-{name}", "baseline", "2026-09-24/15:14:13-baseline"},
-		{"2006-01-02/15:04:05", "baseline", "2026-09-24/13:14:15"},
-		{"2006-01-02/{name}", "2006-15-04-05", "2026-09-24/2006-15-04-05"},
+		{"{date}/{time}-{name}", "baseline", "2026-09-24/13-14-15-baseline"},
+		{"{date}/{time:%S:%M:%H}-{name}", "baseline", "2026-09-24/15:14:13-baseline"},
+		{"{date}/{time:%H:%M:%S}", "baseline", "2026-09-24/13:14:15"},
+		{"{date}/{time:%H:%M}-{name}", "baseline", "2026-09-24/13:14-baseline"},
+		{"{date:%F}/{time:%R}-{time:%T}-{name}", "baseline", "2026-09-24/13:14-13:14:15-baseline"},
+		{"percent-{date:%Y%%}-{name}", "baseline", "percent-2026%-baseline"},
+		{"{date}/{name}", "2006-15-04-05", "2026-09-24/2006-15-04-05"},
+		{"{date:%Y%m%d}-{name}", "baseline", "20260924-baseline"},
+		{"{date:%Y/%m/%d}/{name}", "baseline", "2026/09/24/baseline"},
+		{"2006-15-04-05/{date}-{name}", "baseline", "2006-15-04-05/2026-09-24-baseline"},
+		{"2006-15-04-05-{name}", "2006-15-04-05", "2006-15-04-05-2006-15-04-05"},
+		{"{name}/{date}/{name}", "baseline", "baseline/2026-09-24/baseline"},
+		{"{date}/{date:%Y%m%d}-{time}/{time:%S:%M:%H}-{name}", "baseline", "2026-09-24/20260924-13-14-15/15:14:13-baseline"},
+		{"2006-01-02/15:04:05", "baseline", "2006-01-02/15:04:05"},
+		{"literal-%Y-%%/{date}-{name}", "baseline", "literal-%Y-%%/2026-09-24-baseline"},
 	} {
 		t.Run(tt.format, func(t *testing.T) {
 			root := t.TempDir()
@@ -149,7 +184,7 @@ func TestConfiguredMissingDirectoryIsEmpty(t *testing.T) {
 func TestNestedCreationPreservesOccupiedDestinations(t *testing.T) {
 	root := t.TempDir()
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
-	layout := Layout{ExperimentFormat: "2006-01-02/{name}"}
+	layout := Layout{ExperimentFormat: "{date}/{name}"}
 	dir, err := Create(root, "baseline", now, CreateOptions{Layout: layout})
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +250,7 @@ func TestConfiguredDirectoryRejectsSymlinkAncestors(t *testing.T) {
 			if err := os.Symlink(outside, target); err != nil {
 				t.Fatal(err)
 			}
-			layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "2006-01-02/{name}"}
+			layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{name}"}
 			if _, err := List(root, layout); err == nil {
 				t.Fatal("List accepted symlink in experiments directory")
 			}
@@ -272,7 +307,7 @@ func TestNestedPathsRequireExactCase(t *testing.T) {
 
 func TestConfiguredLayoutMissingParentDoesNotWrite(t *testing.T) {
 	root := t.TempDir()
-	layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "2006-01-02/{name}"}
+	layout := Layout{ExperimentsDir: "research/trials", ExperimentFormat: "{date}/{name}"}
 	if _, err := Create(root, "child", time.Now(), CreateOptions{Layout: layout, BasedOn: []string{"2026-09-24/missing"}}); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Create = %v; want missing parent error", err)
 	}
