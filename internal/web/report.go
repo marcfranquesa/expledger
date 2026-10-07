@@ -14,6 +14,7 @@ import (
 	"github.com/marcfranquesa/expledger/internal/report"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
 )
@@ -150,4 +151,7 @@ func safeReportURL(destination string) bool {
 	return false
 }
 
-var reportMarkdown = goldmark.New(goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(reportAssetRenderer{}, 100))))
+var reportMarkdown = goldmark.New(
+	goldmark.WithExtensions(extension.Table),
+	goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(reportAssetRenderer{}, 100))),
+)

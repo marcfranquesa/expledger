@@ -23,6 +23,9 @@ body.report-active .report-view { padding-top: 0; }
 .report-markdown pre { overflow: auto; padding: 14px; background: #f0f0eb; border-radius: 6px; font-size: 13px; }
 .report-markdown :not(pre) > code { padding: 2px 4px; background: #f0f0eb; border-radius: 3px; }
 .report-markdown blockquote { margin-left: 0; padding-left: 18px; border-left: 3px solid #d4d4ce; color: #60605a; }
+.report-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.report-markdown th, .report-markdown td { padding: 8px 10px; border-bottom: 1px solid #e8e8e2; white-space: nowrap; }
+.report-markdown th { text-align: left; font-weight: 600; background: #fafaf9; }
 .report-image-alt { color: #60605a; }
 .report-chart { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 20px; border: 1px solid #dcdcd6; border-radius: 8px; background: white; }
 .report-chart h2 { font-size: 15px; }
