@@ -1,0 +1,21 @@
+{
+  "method": {
+    "browser": "Codex in-app browser",
+    "input": "Live ExpLedger project fixture with two charts sharing one three-series CSV",
+    "state": "Report selected after JavaScript chart rendering; measurements repeated with both recent-data tables collapsed and expanded",
+    "disclosureResult": "Counts were unchanged when both tables expanded because the bounded raw rows already exist in the DOM",
+    "definitions": {
+      "pageElements": "document.querySelectorAll('*').length",
+      "reportElements": "document.querySelector('.report-view').querySelectorAll('*').length; excludes the report root",
+      "chartSVGDescendants": "document.querySelectorAll('.chart-area svg *').length; excludes the SVG roots",
+      "dots": "document.querySelectorAll('.chart-point').length; excludes three inspection-marker circles",
+      "rawTableRows": "document.querySelectorAll('tbody tr').length; the fixture contains only the two report tables",
+      "rawTableCells": "document.querySelectorAll('tbody td').length"
+    }
+  },
+  "measurements": [
+    {"recordedRows": 10000, "pageElements": 2231, "reportElements": 2163, "chartSVGDescendants": 1406, "dots": 1366, "rawTableRows": 200, "rawTableCells": 500, "lossPlotRows": 458, "throughputPlotRows": 453},
+    {"recordedRows": 100000, "pageElements": 2236, "reportElements": 2168, "chartSVGDescendants": 1411, "dots": 1371, "rawTableRows": 200, "rawTableCells": 500, "lossPlotRows": 492, "throughputPlotRows": 390},
+    {"recordedRows": 1000000, "pageElements": 1975, "reportElements": 1907, "chartSVGDescendants": 1150, "dots": 1110, "rawTableRows": 200, "rawTableCells": 500, "lossPlotRows": 311, "throughputPlotRows": 490}
+  ]
+}

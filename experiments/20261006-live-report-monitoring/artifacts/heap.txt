@@ -1,0 +1,19 @@
+=== RUN   TestMonitorMemory
+=== RUN   TestMonitorMemory/rows10000
+    monitor_benchmark_test.go:205: Cold baselineHeapBytes=689096 sampledPeakHeapBytes=3791720 retainedHeapBytes=1077720 sampledPeakHeapDeltaBytes=3102624 retainedHeapDeltaBytes=388624 allocatedBytes=6656744 responseBytes=75377 httpStatus=200
+    monitor_benchmark_test.go:205: Warm baselineHeapBytes=947512 sampledPeakHeapBytes=1127496 retainedHeapBytes=979328 sampledPeakHeapDeltaBytes=179984 retainedHeapDeltaBytes=31816 allocatedBytes=179984 responseBytes=0 httpStatus=304
+    monitor_benchmark_test.go:205: Append baselineHeapBytes=947848 sampledPeakHeapBytes=3584368 retainedHeapBytes=1085376 sampledPeakHeapDeltaBytes=2636520 retainedHeapDeltaBytes=137528 allocatedBytes=6497032 responseBytes=75396 httpStatus=200
+=== RUN   TestMonitorMemory/rows100000
+    monitor_benchmark_test.go:205: Cold baselineHeapBytes=791112 sampledPeakHeapBytes=3936512 retainedHeapBytes=1079552 sampledPeakHeapDeltaBytes=3145400 retainedHeapDeltaBytes=288440 allocatedBytes=14658160 responseBytes=76066 httpStatus=200
+    monitor_benchmark_test.go:205: Warm baselineHeapBytes=953312 sampledPeakHeapBytes=1133120 retainedHeapBytes=985872 sampledPeakHeapDeltaBytes=179808 retainedHeapDeltaBytes=32560 allocatedBytes=179808 responseBytes=0 httpStatus=304
+    monitor_benchmark_test.go:205: Append baselineHeapBytes=954136 sampledPeakHeapBytes=3864056 retainedHeapBytes=1086768 sampledPeakHeapDeltaBytes=2909920 retainedHeapDeltaBytes=132632 allocatedBytes=14649016 responseBytes=76020 httpStatus=200
+=== RUN   TestMonitorMemory/rows1000000
+    monitor_benchmark_test.go:205: Cold baselineHeapBytes=793048 sampledPeakHeapBytes=3965776 retainedHeapBytes=1082680 sampledPeakHeapDeltaBytes=3172728 retainedHeapDeltaBytes=289632 allocatedBytes=87557136 responseBytes=74421 httpStatus=200
+    monitor_benchmark_test.go:205: Warm baselineHeapBytes=950672 sampledPeakHeapBytes=1130176 retainedHeapBytes=982144 sampledPeakHeapDeltaBytes=179504 retainedHeapDeltaBytes=31472 allocatedBytes=179504 responseBytes=0 httpStatus=304
+    monitor_benchmark_test.go:205: Append baselineHeapBytes=950416 sampledPeakHeapBytes=3981104 retainedHeapBytes=1083984 sampledPeakHeapDeltaBytes=3030688 retainedHeapDeltaBytes=133568 allocatedBytes=87558008 responseBytes=74377 httpStatus=200
+--- PASS: TestMonitorMemory (0.95s)
+    --- PASS: TestMonitorMemory/rows10000 (0.03s)
+    --- PASS: TestMonitorMemory/rows100000 (0.10s)
+    --- PASS: TestMonitorMemory/rows1000000 (0.82s)
+PASS
+ok  	github.com/marcfranquesa/expledger/internal/cli	1.201s

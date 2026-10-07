@@ -25,13 +25,14 @@
   <figure class="report-chart" data-block-key="{{.Key}}" data-chart-type="line">
     <figcaption><h2 id="{{.Key}}-title">{{.Title}}</h2></figcaption>
     {{if .Rows}}
-    <div class="chart-area" hidden data-chart-x="{{.X}}" aria-labelledby="{{.Key}}-title" tabindex="0"></div>
+    <p class="chart-summary" id="{{.Key}}-description">{{.ChartSummary}}</p>
+    <div class="chart-area" hidden data-chart-x="{{.X}}" aria-label="{{.Title}}" aria-describedby="{{.Key}}-description" tabindex="0"></div>
     <ul class="chart-legend" hidden aria-label="Chart series">{{range $i, $name := .Series}}<li class="series-{{$i}}"><svg class="chart-swatch" aria-hidden="true" viewBox="0 0 28 8"><line class="chart-series" x1="0" y1="4" x2="28" y2="4" /></svg>{{$name}}</li>{{end}}</ul>
     <p class="chart-readout" hidden aria-live="polite"></p>
     <details class="chart-table" open>
-      <summary>View data <span>· {{len .Rows}} points</span></summary>
+      <summary>View data <span>· {{.TableSummary}}</span></summary>
       <div class="table-scroll" tabindex="0" role="region" aria-label="{{.Title}} data">
-        <table><caption>{{.Title}}. Missing values are shown as an em dash.</caption><thead><tr><th scope="col">{{.X}}</th>{{range .Series}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+        <table><caption>{{.TableCaption}}</caption><thead><tr><th scope="col">{{.X}}</th>{{range .Series}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
         <tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody></table>
       </div>
     </details>

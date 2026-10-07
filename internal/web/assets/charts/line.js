@@ -7,27 +7,36 @@ function initializeLineChart(figure, saved = {}) {
   const listeners = new AbortController();
   const xRange = Charts.domain(data.x);
   const yRange = Charts.domain(data.series.flatMap(series => series.values));
-  let frame = null, crosshair = null, dots = [], selected = saved.selected ?? null;
-  let pendingScroll = saved;
+  const totalRows = data.totalRows;
+  const restarted = (saved.sourceID && data.sourceID && saved.sourceID !== data.sourceID) || totalRows < saved.totalRows || data.x.at(-1) < saved.lastX;
+  let frame = null, crosshair = null, dots = [], selected = null;
+  if (!restarted && Number.isFinite(saved.selectedX)) {
+    let distance = Infinity;
+    data.x.forEach((value, index) => {
+      const next = Math.abs(value / 2 - saved.selectedX / 2);
+      if (next < distance) { selected = index; distance = next; }
+    });
+  }
+  let pendingScroll = saved.left !== undefined || saved.top !== undefined ? saved : null;
   let lastScroll = {left: saved.left || 0, top: saved.top || 0};
   area.hidden = false;
   readout.hidden = false;
   legend.hidden = data.series.length < 2;
   table.open = saved.open ?? false;
   area.setAttribute('role', 'group');
-  area.setAttribute('aria-label', `${figure.querySelector('h2').textContent}. Use left and right arrows to inspect points, Home and End for first and last, Escape to clear. Data table follows.`);
+  area.setAttribute('aria-label', `${figure.querySelector('h2').textContent}. ${data.sampled ? 'Sampled recorded rows.' : 'Recorded rows.'} Use left and right arrows to inspect plotted rows, Home and End for first and last, Escape to clear. Recent data table follows.`);
   function inspect(index) {
     selected = index === null ? null : Math.max(0, Math.min(data.x.length - 1, index));
     if (!frame) return;
     crosshair.toggleAttribute('hidden', selected === null);
     dots.forEach(dot => dot.setAttribute('hidden', ''));
     if (selected === null) {
-      readout.textContent = 'Hover or use arrow keys to inspect values.';
+      readout.textContent = 'Hover or use arrow keys to inspect a plotted row and its exact recorded values.';
       return;
     }
     crosshair.setAttribute('x1', frame.x(data.x[selected]));
     crosshair.setAttribute('x2', frame.x(data.x[selected]));
-    const values = [`${area.dataset.chartX}: ${Charts.format(data.x[selected])}`];
+    const values = [`${data.sampled ? 'Sampled row' : 'Recorded row'} · ${area.dataset.chartX}: ${data.x[selected]}`];
     data.series.forEach((series, i) => {
       const value = series.values[selected];
       if (value !== null) {
@@ -35,7 +44,7 @@ function initializeLineChart(figure, saved = {}) {
         dots[i].setAttribute('cx', frame.x(data.x[selected]));
         dots[i].setAttribute('cy', frame.y(value));
       }
-      values.push(`${series.name}: ${value === null ? 'missing' : Charts.format(value)}`);
+      values.push(`${series.name}: ${value === null ? 'missing' : value}`);
     });
     readout.textContent = values.join(' · ');
   }
@@ -46,6 +55,7 @@ function initializeLineChart(figure, saved = {}) {
       let path = '', connected = false;
       series.values.forEach((value, j) => {
         if (value === null) { connected = false; return; }
+        if (series.breaks?.[j]) connected = false;
         path += `${connected ? 'L' : 'M'} ${frame.x(data.x[j])} ${frame.y(value)} `;
         connected = true;
       });
@@ -63,6 +73,15 @@ function initializeLineChart(figure, saved = {}) {
     });
     inspect(selected);
   }
+  function restoreScroll() {
+    const scroller = table.querySelector('.table-scroll');
+    if (pendingScroll && scroller.clientWidth) {
+      scroller.scrollTo(pendingScroll.left || 0, pendingScroll.top || 0);
+      lastScroll = {left: scroller.scrollLeft, top: scroller.scrollTop};
+      pendingScroll = null;
+    }
+  }
+  table.addEventListener('toggle', restoreScroll, {signal: listeners.signal});
   area.addEventListener('pointermove', event => {
     if (!frame) return;
     const px = event.clientX - area.getBoundingClientRect().left;
@@ -92,13 +111,10 @@ function initializeLineChart(figure, saved = {}) {
     draw,
     capture: () => {
       const scroller = table.querySelector('.table-scroll');
-      if (scroller.clientWidth) lastScroll = {left: scroller.scrollLeft, top: scroller.scrollTop};
-      return {selected, open: table.open, ...lastScroll};
+      if (scroller.clientWidth && !pendingScroll) lastScroll = {left: scroller.scrollLeft, top: scroller.scrollTop};
+      return {selectedX: selected === null ? null : data.x[selected], sourceID: data.sourceID, totalRows, lastX: data.x.at(-1), open: table.open, ...lastScroll};
     },
-    restoreScroll: () => {
-      const scroller = table.querySelector('.table-scroll');
-      if (pendingScroll && scroller.clientWidth) { scroller.scrollTo(pendingScroll.left || 0, pendingScroll.top || 0); pendingScroll = null; }
-    },
+    restoreScroll,
     dispose: () => { listeners.abort(); observer.disconnect(); }
   };
 }

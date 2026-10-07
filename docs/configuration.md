@@ -87,7 +87,11 @@ experiment_format: "{date}/{time}-{slug}"
 
 This creates `research/trials/2026-10-06/14-23-45-baseline/`. Its ID is
 `2026-10-06/14-23-45-baseline`; use that full ID for `run`, `validate`, and
-`--based-on`. IDs use canonical relative paths with the same path restrictions
+`--based-on`. Put its optional `report.yaml` beside `experiment.yaml`, at
+`research/trials/2026-10-06/14-23-45-baseline/report.yaml`; a source such as
+`results/metrics.csv` resolves inside that experiment folder. The
+[report guide](reports.md) covers schema, logging, and live monitoring.
+IDs use canonical relative paths with the same path restrictions
 as `experiments_dir`. An existing path is an error; ExpLedger does not add a
 counter to resolve collisions. Below the first ID component, `experiment.yaml`
 is reserved for metadata and cannot name a directory. Changing the format affects

@@ -1,0 +1,55 @@
+UTC 2026-10-07T00:32:32Z
+8a4bdf2c3d09793a12fdada6f8b824c237a3487a
+ M docs/configuration.md
+ M docs/getting-started.md
+ M docs/reports.md
+ M docs/running.md
+ M internal/cli/cli_test.go
+ M internal/cli/help.go
+ M internal/cli/serve.go
+ M internal/cli/sources.go
+ M internal/report/csv.go
+ M internal/report/report.go
+ M internal/report/report_test.go
+ M internal/web/assets/charts/line.js
+ M internal/web/assets/live.js
+ M internal/web/assets/reports.js
+ M internal/web/assets/styles/report.css
+ M internal/web/report.go
+ M internal/web/report_test.go
+ M internal/web/server.go
+ M internal/web/templates/report.html
+?? experiments/
+?? expledger.yaml
+?? internal/cli/monitor_benchmark_test.go
+?? internal/cli/monitor_refresh_test.go
+?? internal/report/cache_test.go
+?? internal/report/csv_test.go
+?? internal/report/monitor_benchmark_test.go
+?? internal/report/reader_test.go
+ docs/configuration.md                 |   6 +-
+ docs/getting-started.md               |   5 +-
+ docs/reports.md                       | 165 ++++++++++++++-
+ docs/running.md                       |   8 +-
+ internal/cli/cli_test.go              |  11 +-
+ internal/cli/help.go                  |  22 +-
+ internal/cli/serve.go                 |   2 +-
+ internal/cli/sources.go               |  11 +-
+ internal/report/csv.go                | 381 +++++++++++++++++++++++++++++++---
+ internal/report/report.go             | 287 +++++++++++++++++++------
+ internal/report/report_test.go        |  81 +++-----
+ internal/web/assets/charts/line.js    |  40 ++--
+ internal/web/assets/live.js           |   5 +-
+ internal/web/assets/reports.js        |   7 +-
+ internal/web/assets/styles/report.css |   1 +
+ internal/web/report.go                |  30 ++-
+ internal/web/report_test.go           |  54 ++++-
+ internal/web/server.go                |  25 ++-
+ internal/web/templates/report.html    |   7 +-
+ 19 files changed, 956 insertions(+), 192 deletions(-)
+go version go1.27.1 darwin/arm64
+Darwin 25.6.0 arm64
+source_sha256_before=c7cd38d9ee4c751815a0110140daff48881616347d321ed873bdaad2162c8ed7  -
+Timing: go test -count=1 -run ^$ -bench ^BenchmarkMonitor -benchtime 3x -benchmem ./internal/report ./internal/cli (three process runs)
+Heap observation: EXPLEDGER_MONITOR_MEMORY=1 go test -count=1 -run ^TestMonitorMemory$ -v ./internal/cli
+source_sha256_after=c7cd38d9ee4c751815a0110140daff48881616347d321ed873bdaad2162c8ed7  -

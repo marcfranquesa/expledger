@@ -1,13 +1,16 @@
 function initializeLive(applySnapshot) {
   const status = document.querySelector('.refresh-status');
+  let revision = null;
   async function refresh() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch('/snapshot', {cache: 'no-store', signal: controller.signal});
+      const response = await fetch('/snapshot', {cache: 'no-store', signal: controller.signal, headers: revision ? {'If-None-Match': revision} : {}});
+      if (response.status === 304) { status.hidden = true; return; }
       if (!response.ok) throw new Error((await response.text()).trim() || 'Snapshot unavailable');
       const next = new DOMParser().parseFromString(await response.text(), 'text/html');
       if (applySnapshot(next) === false) return;
+      revision = response.headers.get('ETag');
       status.hidden = true;
     } catch (error) {
       status.textContent = `Refresh unavailable. Showing the last successful update; retrying shortly. ${error.message}`;

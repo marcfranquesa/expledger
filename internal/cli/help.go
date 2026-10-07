@@ -5,7 +5,11 @@ const rootDescription = "Manage experiment records in an initialized project"
 const rootDetails = `Manage experiment records and run scripts in an initialized project.
 Run init once in the project directory. Other commands find the nearest
 expledger.yaml in the current directory or its parents. Help needs no project.
-See https://marcfranquesa.github.io/expledger/ for guides and configuration.`
+Configure experiment folders and ID formats in the project's expledger.yaml.
+Add optional report.yaml beside experiment.yaml for prose and CSV charts.
+Getting started: https://marcfranquesa.github.io/expledger/docs/getting-started/
+Configuration: https://marcfranquesa.github.io/expledger/docs/configuration/
+Reports and monitoring: https://marcfranquesa.github.io/expledger/docs/reports/`
 
 const newDescription = "Create an experiment folder, metadata, README, and run.sh"
 
@@ -29,12 +33,16 @@ const runDescription = "Run an experiment's run.sh in its existing folder"
 
 const runDetails = `Execute ./run.sh from experiments_dir/ID/ with the current checkout and environment.
 The project expledger.yaml configures experiments_dir, defaulting to experiments.
+With experiments_dir: trials, ID 2026-10-06/baseline runs
+trials/2026-10-06/baseline/run.sh; put report.yaml beside experiment.yaml there.
 Keep workload parameters in run.sh or its input files; extra arguments are rejected.
 The script chooses output paths. Metadata is not changed and no provenance is
 recorded. Git is not required.
 The shebang selects the runtime. Standard streams and exit status are forwarded.
 Ctrl+C stops the workload and its ordinary child processes. Requires macOS or
-Linux; supports batch workloads, not interactive terminal input or daemons.`
+Linux; supports batch workloads, not interactive terminal input or daemons.
+Running guide: https://marcfranquesa.github.io/expledger/docs/running/
+CSV logging and monitoring: https://marcfranquesa.github.io/expledger/docs/reports/`
 
 const newExample = `  expledger new my-idea
   expledger new my-idea --title "My experiment" --based-on 20260920-baseline
@@ -69,16 +77,20 @@ Other files in the directory are left unchanged. The root expledger.yaml's optio
 remote_url supplies the full browser URL of the remote experiments directory.
 Each ID path segment is escaped and appended; omit remote_url for a local-only catalog.
 Only the current project is included; sources applies only to serve.
-The generated page needs no running ExpLedger server and does not poll.`
+The generated page needs no running ExpLedger server and does not poll.
+Report schema and CSV requirements: https://marcfranquesa.github.io/expledger/docs/reports/`
 
 const serveDescription = "Browse experiments in a local web page"
 
 const serveDetails = `Serve experiments on 127.0.0.1 with live list and lineage views.
 Include optional report.yaml blocks with shared chart styling.
-Poll configuration, records, and report sources every few seconds without reloading the page.
+Poll configuration, records, and report sources three seconds after each completed
+request, with a ten-second request timeout, without reloading the page.
 Use sources in expledger.yaml, or repeat --source to replace that list.
 Paths name project roots; relative paths resolve from the current project config
 directory. No ~ or environment-variable expansion is performed.
 The first source wins each ID, including its relationships and remote links.
 Other commands remain scoped to the current project. Failed refreshes keep the
-last valid view until recovery. Press Ctrl+C to stop the server.`
+last valid view until recovery. Press Ctrl+C to stop the server.
+Logging, local preview, and SSH forwarding: https://marcfranquesa.github.io/expledger/docs/reports/
+Multiple projects: https://marcfranquesa.github.io/expledger/docs/running/#browsing-multiple-projects`

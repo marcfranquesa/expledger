@@ -66,6 +66,11 @@ func TestRootHelp(t *testing.T) {
 			if strings.Contains(stdout.String(), "completion") {
 				t.Fatalf("root help lists an unsupported completion command: %q", stdout.String())
 			}
+			for _, want := range []string{"report.yaml", "/docs/getting-started/", "/docs/configuration/", "/docs/reports/"} {
+				if !strings.Contains(stdout.String(), want) {
+					t.Errorf("root help missing %q: %s", want, stdout.String())
+				}
+			}
 			assertEmptyDirectory(t, root)
 		})
 	}
@@ -79,10 +84,10 @@ func TestCommandHelp(t *testing.T) {
 		{name: "init", helpText: []string{"--remote-url"}},
 		{name: "new", argument: "<slug>"},
 		{name: "validate", argument: "<id>"},
-		{name: "run", argument: "<id>", helpText: []string{"run.sh"}},
+		{name: "run", argument: "<id>", helpText: []string{"run.sh", "trials/2026-10-06/baseline/run.sh", "report.yaml", "/docs/running/", "/docs/reports/"}},
 		{name: "list"},
-		{name: "build", helpText: []string{"--output", "dist", "index.html", "snapshot"}},
-		{name: "serve", helpText: []string{"--port", "127.0.0.1", "Ctrl+C"}},
+		{name: "build", helpText: []string{"--output", "dist", "index.html", "snapshot", "/docs/reports/"}},
+		{name: "serve", helpText: []string{"--port", "127.0.0.1", "Ctrl+C", "three seconds", "ten-second", "SSH forwarding", "/docs/reports/", "/docs/running/#browsing-multiple-projects"}},
 	} {
 		for _, args := range [][]string{
 			{"help", command.name},
