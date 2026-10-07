@@ -14,8 +14,8 @@ import (
 type application struct {
 	cwd         string
 	projectRoot string
-	now         time.Time
 	config      projectConfig
+	now         time.Time
 }
 
 // Streams connects the command and its workload to the caller's input and output.

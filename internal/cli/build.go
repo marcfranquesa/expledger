@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/web"
 	"github.com/spf13/cobra"
 )
@@ -30,13 +29,11 @@ func buildExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			records, err := catalog.List(app.projectRoot, app.config.Layout)
+			snapshot, err := loadSnapshot(app.projectRoot, []string{"."})
 			if err != nil {
 				return err
 			}
-			body, err := web.Render(records, web.PageOptions{
-				Project: filepath.Base(app.projectRoot), RemoteURL: app.config.RemoteURL,
-			})
+			body, err := web.Render(snapshot.Records, snapshot.Options)
 			if err != nil {
 				return err
 			}

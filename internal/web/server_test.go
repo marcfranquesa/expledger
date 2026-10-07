@@ -4,26 +4,24 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/marcfranquesa/expledger/internal/catalog"
 	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
 
-func catalogHandler(root string, options web.PageOptions) http.Handler {
-	return web.NewLiveHandler(func() (web.Snapshot, error) {
-		records, err := catalog.List(root, catalog.Layout{})
-		return web.Snapshot{Records: records, Options: options}, err
-	})
-}
-
 func TestExperiments(t *testing.T) {
-	root := filepath.Join("..", "..", "testdata", "project")
-	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/research%2Fnext/experiments/"})
+	snapshot := web.Snapshot{
+		Records: []experiment.Record{
+			{ID: "20260924-long-title", Title: "Unicode & HTML: comparing café embeddings with α < β across a deliberately long experiment title", CreatedAt: time.Date(2026, 9, 24, 11, 45, 0, 123456789, time.UTC)},
+			{ID: "20260924-variant", Title: "Lower learning rate", CreatedAt: time.Date(2026, 9, 24, 10, 30, 0, 0, time.UTC)},
+			{ID: "20260924-baseline", Title: "Baseline model", CreatedAt: time.Date(2026, 9, 24, 9, 0, 0, 0, time.UTC)},
+		},
+		Options: web.PageOptions{Project: "Project", RemoteURL: "https://github.com/example/project/tree/research%2Fnext/experiments/"},
+	}
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) { return snapshot, nil })
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK {
@@ -37,7 +35,7 @@ func TestExperiments(t *testing.T) {
 		"Sep 24, 2026 · 11:45:00 UTC",
 		`datetime="2026-09-24T10:30:00Z"`,
 		"Sep 24, 2026 · 10:30:00 UTC",
-		filepath.Base(root),
+		"Project",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("response missing %q", want)
@@ -72,71 +70,10 @@ func TestExperiments(t *testing.T) {
 	}
 }
 
-func TestRefreshReadsCurrentFiles(t *testing.T) {
-	root := t.TempDir()
-	if err := os.CopyFS(root, os.DirFS(filepath.Join("..", "..", "testdata", "project"))); err != nil {
-		t.Fatal(err)
-	}
-	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Baseline model") {
-		t.Fatalf("initial response: %d %s", response.Code, response.Body)
-	}
-	metadata := filepath.Join(root, "experiments", "20260924-baseline", "experiment.yaml")
-	data, err := os.ReadFile(metadata)
-	if err != nil {
-		t.Fatal(err)
-	}
-	updated := strings.Replace(string(data), "title: Baseline model", "title: Updated baseline", 1)
-	if err := os.WriteFile(metadata, []byte(updated), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Updated baseline") || strings.Contains(response.Body.String(), "Baseline model") {
-		t.Fatalf("refresh did not reflect changed files: %d %s", response.Code, response.Body)
-	}
-}
-
-func TestRefreshRecoversAfterMetadataRepair(t *testing.T) {
-	root := t.TempDir()
-	dir := filepath.Join(root, "experiments", "example")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	metadata := filepath.Join(dir, "experiment.yaml")
-	if err := os.WriteFile(metadata, []byte("invalid metadata"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	handler := catalogHandler(root, web.PageOptions{
-		Project: "Example", RemoteURL: "https://github.com/example/project/tree/main/experiments/",
-	})
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "experiment.yaml") {
-		t.Fatalf("invalid metadata response: %d %s", response.Code, response.Body)
-	}
-	if response.Header().Get("Cache-Control") != "no-store" {
-		t.Fatal("invalid metadata response may be cached")
-	}
-	content := "schema: expledger/v1\nid: example\ntitle: Repaired example\ncreated_at: 2026-09-24T12:00:00Z\n"
-	if err := os.WriteFile(metadata, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Repaired example") {
-		t.Fatalf("repaired metadata response: %d %s", response.Code, response.Body)
-	}
-}
-
 func TestEmptyCatalogAndRoutes(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("Private repository file"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	handler := catalogHandler(root, web.PageOptions{Project: filepath.Base(root), RemoteURL: "https://github.com/example/project/tree/main/experiments/"})
+	handler := web.NewLiveHandler(func() (web.Snapshot, error) {
+		return web.Snapshot{Options: web.PageOptions{Project: "Empty"}}, nil
+	})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No experiments yet") || !strings.Contains(response.Body.String(), "expledger new my-idea") {

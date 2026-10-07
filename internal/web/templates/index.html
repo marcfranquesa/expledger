@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Project}} · ExpLedger</title>
+  {{range .Styles}}<style>{{.}}</style>{{end}}
+</head>
+<body>
+  <main>
+    <header class="catalog-heading">
+      <p class="brand">ExpLedger</p>
+      <h1>Experiments</h1>
+      <div class="context"><span>{{.Project}}</span></div>
+    </header>
+    <div class="view-controls" hidden role="group" aria-label="Experiment view">
+      <button type="button" aria-pressed="true" aria-controls="list-view" data-view="list-view">List</button>
+      <button type="button" aria-pressed="false" aria-controls="graph-view" data-view="graph-view">Graph</button>
+    </div>
+    {{if .Live}}<p class="refresh-status" role="status" hidden></p>{{end}}
+    <div id="list-view">
+    <p class="section-heading">Newest first</p>
+    {{if .Experiments}}
+    <ol class="experiments">
+      {{range .Experiments}}
+      <li class="experiment" data-id="{{.ID}}" tabindex="-1">
+        <div class="record">
+          <h2>{{.Title}}</h2>
+          <code class="id">{{.ID}}</code>
+          <time datetime="{{.DateTime}}">{{.CreatedAt}}</time>
+        </div>
+        {{if .ReportURL}}<div class="experiment-actions"><a class="report-link" href="{{.ReportURL}}" data-report-link>View report</a>{{end}}
+        {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}
+        {{if .ReportURL}}</div>{{end}}
+      </li>
+      {{end}}
+    </ol>
+    {{else}}
+    <section class="empty">
+      <h2>No experiments yet</h2>
+      <p>Create your first record with <code>expledger new my-idea</code>.</p>
+    </section>
+    {{end}}
+    </div>
+    <section id="graph-view" hidden aria-label="Experiment lineage">
+      {{if .Experiments}}
+      <div class="graph-toolbar" role="group" aria-label="Graph controls">
+        <input type="search" aria-label="Find experiment" placeholder="Find experiment…">
+        <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+        <output class="zoom-level" aria-label="Zoom level">100%</output>
+        <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="actual">100%</button>
+      </div>
+      <div class="graph-workspace">
+      <div class="graph-scroll" tabindex="0" role="region" aria-label="Experiment graph">
+        <div class="graph-stage">
+        <div class="graph-canvas">
+          <svg class="graph-edges" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#73736a" /></marker><marker id="arrow-highlight" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" fill="#242424" /></marker></defs>
+          {{range .Graph.Edges}}<path data-from="{{.From}}" data-to="{{.To}}" marker-end="url(#arrow)" />{{end}}</svg>
+          <div class="graph-rows">
+          {{range $rank, $row := .Graph.Rows}}<div class="graph-row">
+            {{range $row}}<article class="graph-node{{if .Missing}} missing{{end}}" role="button" aria-pressed="false" tabindex="0" data-node="{{.Index}}" data-id="{{.ID}}" data-rank="{{$rank}}" data-terminal="{{.Terminal}}" aria-labelledby="graph-title-{{.Index}} graph-id-{{.Index}}">
+              <h2 id="graph-title-{{.Index}}">{{.Title}}</h2><div class="node-details" hidden><code class="id" id="graph-id-{{.Index}}">{{.ID}}</code>
+              {{if not .Missing}}<time datetime="{{.DateTime}}">{{.CreatedAt}}</time>{{end}}
+              {{if .Missing}}<p class="parents">Referenced in based_on; absent from this catalog.</p>{{else}}
+              <p class="parents">{{if .Parents}}Based on: {{range $i, $parent := .Parents}}{{if $i}}, {{end}}<code>{{$parent}}</code>{{end}}{{else}}No parents recorded{{end}}</p>
+              {{if .ReportURL}}<a class="report-link" href="{{.ReportURL}}" data-report-link>View report</a>{{end}}
+              {{if .RemoteURL}}<a class="remote-link" href="{{.RemoteURL}}" target="_blank" rel="noopener noreferrer" aria-label="View remote: {{.Title}} (opens in a new tab)">View remote <span aria-hidden="true">↗</span></a>{{end}}{{end}}
+            </div></article>{{end}}
+          </div>{{end}}
+          </div>
+        </div>
+      </div>
+        </div>
+      <aside class="graph-details" aria-label="Experiment details"><p>Select an experiment</p></aside>
+      </div>
+      {{else}}<section class="empty"><h2>No experiments yet</h2><p>Create your first record with <code>expledger new my-idea</code>.</p></section>{{end}}
+    </section>
+    {{template "reports" .}}
+  </main>
+  {{range .Scripts}}<script type="text/javascript">{{.}}</script>{{end}}
+</body>
+</html>

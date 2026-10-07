@@ -3,7 +3,6 @@ package web
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"html/template"
 	"net/url"
@@ -11,15 +10,11 @@ import (
 	"time"
 
 	"github.com/marcfranquesa/expledger/internal/experiment"
+	"github.com/marcfranquesa/expledger/internal/report"
 )
 
-//go:embed index.html
-var indexHTML string
-
-var indexTemplate = template.Must(template.New("index").Parse(indexHTML))
-
 type experimentView struct {
-	ID, Title, CreatedAt, DateTime, RemoteURL string
+	ID, Title, CreatedAt, DateTime, RemoteURL, ReportURL string
 }
 
 type page struct {
@@ -27,6 +22,9 @@ type page struct {
 	Experiments []experimentView
 	Graph       graphView
 	Live        bool
+	Reports     []reportView
+	Styles      []template.CSS
+	Scripts     []template.JS
 }
 
 // PageOptions supplies display metadata and an optional experiments-directory URL.
@@ -36,6 +34,7 @@ type PageOptions struct {
 	// an empty URL for a source without remote links.
 	RemoteURLs map[string]string
 	Live       bool
+	Reports    map[string]*report.Report
 }
 
 // Render renders a complete HTML page with records in their supplied order.
@@ -61,7 +60,17 @@ func Render(records []experiment.Record, options PageOptions) ([]byte, error) {
 			DateTime:  created.Format(time.RFC3339Nano),
 			RemoteURL: remoteURL,
 		})
+		if source := options.Reports[record.ID]; source != nil {
+			view := &data.Experiments[len(data.Experiments)-1]
+			view.ReportURL = "#" + reportAnchor(record.ID)
+			prepared, err := prepareReport(*view, source)
+			if err != nil {
+				return nil, fmt.Errorf("render report %s: %w", record.ID, err)
+			}
+			data.Reports = append(data.Reports, prepared)
+		}
 	}
+	data.Styles, data.Scripts = pageAssets(options.Live)
 	data.Graph = lineage(records, data.Experiments)
 	var body bytes.Buffer
 	if err := indexTemplate.Execute(&body, data); err != nil {

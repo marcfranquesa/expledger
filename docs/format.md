@@ -12,7 +12,8 @@ and the creation format. This file is the sole source of
 ExpLedger metadata. `README.md` holds independent notes; other files can hold
 scripts, artifacts, or another tool's
 metadata. `new` creates a README and an executable `run.sh` stub; neither file is
-required for catalog reads.
+required for catalog reads. An optional `report.yaml` declares a browser report
+using Markdown and CSV results; see [Experiment reports](reports.md).
 
 ```yaml
 schema: expledger/v1

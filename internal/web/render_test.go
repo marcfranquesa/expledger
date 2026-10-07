@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +9,44 @@ import (
 	"github.com/marcfranquesa/expledger/internal/experiment"
 	"github.com/marcfranquesa/expledger/internal/web"
 )
+
+func TestRenderInlineAssets(t *testing.T) {
+	for _, live := range []bool{false, true} {
+		name := "static"
+		if live {
+			name = "live"
+		}
+		t.Run(name, func(t *testing.T) {
+			body, err := web.Render([]experiment.Record{{ID: "trial", Title: "Trial"}}, web.PageOptions{Live: live})
+			if err != nil {
+				t.Fatal(err)
+			}
+			page := string(body)
+			if regexp.MustCompile(`<(script|link)\b[^>]*(src=|rel="stylesheet")`).MatchString(page) {
+				t.Fatal("page requires an external script or stylesheet")
+			}
+			scripts := regexp.MustCompile(`(?s)<script type="text/javascript">(.*?)</script>`).FindAllStringSubmatch(page, -1)
+			want := []string{"function initializeGraph(", "const Charts =", "function initializeLineChart(", "function initializeReports("}
+			if live {
+				want = append(want, "function initializeLive(")
+			}
+			want = append(want, "(() => {")
+			if len(scripts) != len(want) {
+				t.Fatalf("got %d inline scripts, want %d", len(scripts), len(want))
+			}
+			for i, marker := range want {
+				if !strings.Contains(scripts[i][1], marker) {
+					t.Errorf("inline script %d missing dependency %q", i, marker)
+				}
+			}
+			for _, marker := range []string{"fetch(", "setTimeout(", `class="refresh-status" role="status"`} {
+				if strings.Contains(page, marker) != live {
+					t.Errorf("live content %q inclusion does not match Live=%t", marker, live)
+				}
+			}
+		})
+	}
+}
 
 func TestRenderInMemory(t *testing.T) {
 	records := []experiment.Record{

@@ -1,0 +1,50 @@
+.experiment-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 8px; }
+.report-link, .report-back { color: #33332e; font-size: 13px; text-decoration: none; }
+.report-link { display: inline-block; padding: 9px 12px; border: 1px solid #33332e; border-radius: 6px; background: #33332e; color: white; }
+.report-link:hover { background: #50504a; }
+.report-back:hover { text-decoration: underline; }
+.graph-details .report-link { margin-top: 16px; }
+.report-view { padding-top: 36px; }
+body.report-active .catalog-heading > h1, body.report-active .catalog-heading .context, body.report-active .view-controls { display: none; }
+body.report-active .report-view { padding-top: 0; }
+.report-heading { margin-bottom: 36px; }
+.report-heading .section-heading { margin: 24px 0 18px; }
+.report-heading .remote-link { margin-top: 18px; }
+.report-blocks { display: grid; gap: 32px; }
+.report-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch; }
+.report-row > * { flex: 1 1 300px; min-width: min(300px, 100%); max-width: 100%; }
+.report-markdown { min-width: 0; font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; }
+.report-markdown > :first-child { margin-top: 0; }
+.report-markdown > :last-child { margin-bottom: 0; }
+.report-markdown h1 { font-size: 28px; margin: 28px 0 12px; }
+.report-markdown h2 { font-size: 23px; margin: 24px 0 10px; }
+.report-markdown h3 { font-size: 18px; margin: 20px 0 8px; }
+.report-markdown a { color: #33332e; text-underline-offset: 3px; }
+.report-markdown pre { overflow: auto; padding: 14px; background: #f0f0eb; border-radius: 6px; font-size: 13px; }
+.report-markdown :not(pre) > code { padding: 2px 4px; background: #f0f0eb; border-radius: 3px; }
+.report-markdown blockquote { margin-left: 0; padding-left: 18px; border-left: 3px solid #d4d4ce; color: #60605a; }
+.report-image-alt { color: #60605a; }
+.report-chart { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 20px; border: 1px solid #dcdcd6; border-radius: 8px; background: white; }
+.report-chart h2 { font-size: 15px; }
+.chart-area { flex-shrink: 0; width: 100%; height: 240px; margin: 10px 0 0; touch-action: pan-y; }
+.chart-area svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chart-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart-label { fill: var(--chart-label); font-size: 11px; font-family: inherit; }
+.chart-legend { display: flex; flex-wrap: wrap; list-style: none; padding: 0; margin: 12px 0 0; gap: 8px 18px; color: #60605a; font-size: 12px; }
+.chart-legend li { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; min-width: 0; }
+.chart-swatch { width: 28px; height: 8px; flex: none; }
+.chart-readout { margin: 12px 0 0; min-height: 2.8em; font-size: 12px; color: #60605a; line-height: 1.4; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.chart-table { margin-top: auto; padding-top: 16px; font-size: 12px; }
+.chart-table summary { cursor: pointer; color: #33332e; }
+.chart-table summary span { color: #60605a; }
+.table-scroll { max-height: 320px; overflow: auto; margin-top: 12px; }
+.chart-table table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; text-align: right; }
+.chart-table caption { text-align: left; color: #60605a; padding-bottom: 8px; line-height: 1.4; }
+.chart-table th, .chart-table td { padding: 8px 10px; border-bottom: 1px solid #e8e8e2; white-space: nowrap; }
+.chart-table th { font-weight: 600; background: #fafaf9; }
+.report-unavailable { margin: 14px 0 0; color: #60605a; font-size: 13px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .report-row { flex-direction: column; }
+  .report-row > * { flex-basis: auto; width: 100%; }
+  .report-chart { padding: 16px; }
+}
