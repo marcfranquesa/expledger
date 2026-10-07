@@ -18,6 +18,7 @@ func TestRenderPortableReportAndSafeMarkdown(t *testing.T) {
 	layout := &report.Report{Blocks: []report.Block{
 		{Type: "markdown", Markdown: "# Introduction\n\n**Measured** results.\n\n<script>alert(1)</script>\n\n[bad](javascript:alert%281%29) <javascript:alert(1)>\n\n[local](results/metrics.csv)\n\n[official](https://example.com/docs?q=1&lang=en)\n\n![Plot & example](https://example.com/private.png)\n"},
 		{Type: "row", Blocks: []report.Block{{Type: "line", Title: `Loss <img src=x>`, X: `step "<&`, Data: &report.Data{X: []float64{0, 1}, Series: []report.Series{{Name: seriesName, Values: []*float64{&value, nil}}}}}, {Type: "line", Title: "Throughput", Message: "Results unavailable"}}},
+		{Type: "markdown", Markdown: "| Mechanism | Contrast | Evidence |\n| --- | ---: | --- |\n| **Prefix** | 0.125 | [local](results/metrics.csv) |\n| Control | -0.5 | [bad](javascript:alert%281%29) ![Plot](plots/control.png) |\n"},
 		{Type: "markdown", Markdown: "## Conclusions\n\nMore work needed."},
 	}}
 	body, err := web.Render(records, web.PageOptions{Project: "Report project", Reports: map[string]*report.Report{records[0].ID: layout}})
@@ -27,6 +28,10 @@ func TestRenderPortableReportAndSafeMarkdown(t *testing.T) {
 	page := string(body)
 	for _, want := range []string{
 		`class="report-link" href="#report-`, `id="reports"`, `class="report-row"`,
+		`<table>`, `<thead>`, `<th>Mechanism</th>`, `<tbody>`,
+		`<td><strong>Prefix</strong></td>`, `<td style="text-align:right">0.125</td>`, `<td style="text-align:right">-0.5</td>`,
+		`<td><span>local (<code>results/metrics.csv</code>)</span>`,
+		`<td><span>bad (<code>javascript:alert%281%29</code>)</span>`, `[Image: Plot]`,
 		`<h1>Introduction</h1>`, `<strong>Measured</strong>`, `<h2>Conclusions</h2>`,
 		`<span>local (<code>results/metrics.csv</code>)</span>`,
 		`href="https://example.com/docs?q=1&amp;lang=en"`, `[Image: Plot &amp; example]`,
