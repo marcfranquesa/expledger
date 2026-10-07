@@ -531,24 +531,33 @@ func TestReadLimits(t *testing.T) {
 		}
 	})
 	t.Run("CSV bytes", func(t *testing.T) {
-		csv := "step,train_loss,validation_loss,unused\n0,1,2," + strings.Repeat("a", 8*1024*1024) + "\n"
-		root, _ := reportFixture(t, lineManifest("results.csv"), map[string]string{"results.csv": csv})
-		if _, err := Read(root, "example", catalog.Layout{}); err == nil {
-			t.Fatal("Read accepted oversized CSV")
+		root, dir := reportFixture(t, lineManifest("results.csv"), nil)
+		file, err := os.Create(filepath.Join(dir, "results.csv"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Truncate(maxCSVBytes + 1); err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Read(root, "example", catalog.Layout{}); err == nil || !strings.Contains(err.Error(), "bytes") {
+			t.Fatalf("Read error = %v, want oversized CSV bytes", err)
 		}
 	})
 	t.Run("total unique source bytes", func(t *testing.T) {
-		var manifest strings.Builder
-		manifest.WriteString("blocks:\n")
-		sources := map[string]string{}
-		for i := range 3 {
-			name := fmt.Sprintf("results%d.csv", i)
-			fmt.Fprintf(&manifest, "  - {type: line, title: Loss, source: %s, x: step, y: [train_loss, validation_loss]}\n", name)
-			sources[name] = "step,train_loss,validation_loss,unused\n0,1,2," + strings.Repeat("a", 6*1024*1024) + "\n"
+		loader := sourceLoader{}
+		for range 2 {
+			if err := loader.account("first.csv", maxCSVBytes); err != nil {
+				t.Fatal(err)
+			}
 		}
-		root, _ := reportFixture(t, manifest.String(), sources)
-		if _, err := Read(root, "example", catalog.Layout{}); err == nil {
-			t.Fatal("Read accepted excessive total source bytes")
+		if err := loader.account("second.csv", maxCSVBytes); err != nil {
+			t.Fatal(err)
+		}
+		if err := loader.account("third.csv", 1); err == nil {
+			t.Fatal("accepted excessive total source bytes")
 		}
 	})
 	t.Run("blocks including rows", func(t *testing.T) {
@@ -565,29 +574,7 @@ func TestReadLimits(t *testing.T) {
 			t.Fatal("Read accepted nine series")
 		}
 	})
-	t.Run("CSV rows", func(t *testing.T) {
-		var csv strings.Builder
-		csv.WriteString("step,train_loss,validation_loss\n")
-		for i := range 10001 {
-			fmt.Fprintf(&csv, "%d,1,2\n", i)
-		}
-		root, _ := reportFixture(t, lineManifest("results.csv"), map[string]string{"results.csv": csv.String()})
-		if _, err := Read(root, "example", catalog.Layout{}); err == nil {
-			t.Fatal("Read accepted 10001 CSV data rows")
-		}
-	})
-	t.Run("selected values", func(t *testing.T) {
-		var csv strings.Builder
-		csv.WriteString("step,loss\n")
-		for i := range 10000 {
-			fmt.Fprintf(&csv, "%d,1\n", i)
-		}
-		manifest := "blocks:\n" + strings.Repeat("  - {type: line, title: Loss, source: results.csv, x: step, y: [loss]}\n", 6)
-		root, _ := reportFixture(t, manifest, map[string]string{"results.csv": csv.String()})
-		if _, err := Read(root, "example", catalog.Layout{}); err == nil {
-			t.Fatal("Read accepted 120000 selected values")
-		}
-	})
+
 }
 
 func TestReadCountsRepeatedNormalizedSourceOnce(t *testing.T) {
@@ -611,27 +598,27 @@ func TestReadCountsRepeatedNormalizedSourceOnce(t *testing.T) {
 	}
 }
 
-func TestSourceLoaderKeepsConsistentSnapshot(t *testing.T) {
-	_, dir := reportFixture(t, "", map[string]string{"results.csv": "step,loss\n0,1\n"})
+func TestMarkdownLoaderKeepsConsistentSnapshot(t *testing.T) {
+	_, dir := reportFixture(t, "", map[string]string{"shared.md": "Original notes\n"})
 	directory, err := os.OpenRoot(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer directory.Close()
 	loader := sourceLoader{root: directory, files: make(map[string]sourceFile)}
-	first, err := loader.source("results.csv", maxCSVBytes)
+	first, err := loader.source("shared.md", maxMarkdownBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeReportFile(t, filepath.Join(dir, "results.csv"), "step,loss\n0,999\n")
-	second, err := loader.source("results.csv", maxCSVBytes)
+	writeReportFile(t, filepath.Join(dir, "shared.md"), "Changed notes\n")
+	second, err := loader.source("shared.md", maxMarkdownBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(first.data) != "step,loss\n0,1\n" || string(second.data) != string(first.data) {
+	if string(first.data) != "Original notes\n" || string(second.data) != string(first.data) {
 		t.Fatalf("sources = %q, %q, want one consistent snapshot", first.data, second.data)
 	}
-	if loader.bytes != len(first.data) {
+	if loader.bytes != int64(len(first.data)) {
 		t.Fatalf("source bytes = %d, want %d once", loader.bytes, len(first.data))
 	}
 }
@@ -660,8 +647,8 @@ func TestReadAcceptsLimits(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(report.Blocks) != 5 || len(report.Blocks[4].Data.X) != 10000 {
-			t.Fatal("expected every point at the report value limit")
+		if len(report.Blocks) != 5 || report.Blocks[4].Data.TotalRows != 10000 || len(report.Blocks[4].Data.X) > maxPlotRows {
+			t.Fatal("expected a bounded projection of every CSV row")
 		}
 	})
 	t.Run("64 blocks", func(t *testing.T) {

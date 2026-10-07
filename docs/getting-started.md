@@ -69,7 +69,9 @@ ExpLedger leaves these notes and the metadata unchanged.
 
 To display prose and result charts in the browser, add an optional `report.yaml`
 beside the metadata. [Experiment reports](reports.md) shows how to combine
-Markdown, line charts, and rows with shared default styling.
+Markdown, line charts, and rows with shared default styling, including a
+[runnable CSV logging example](reports.md#logging-results-while-an-experiment-runs)
+for live monitoring.
 
 ## Browse and share a catalog
 
@@ -83,6 +85,7 @@ Open the printed URL. The browser refreshes automatically; press Ctrl-C to stop.
 Choose **Graph** to explore parent relationships, or configure multiple sources
 to browse projects together. See [Browsing multiple projects](running.md#browsing-multiple-projects)
 and [Experiment graph](running.md#experiment-graph) for details.
+For a remote workload, use the [SSH forwarding example](reports.md#monitor-a-remote-project-over-ssh).
 To create a self-contained HTML snapshot instead:
 
 ```sh

@@ -15,9 +15,11 @@ func TestRenderPortableReportAndSafeMarkdown(t *testing.T) {
 	value := 1.25
 	seriesName := `loss </script><img src=x onerror=alert(1)>`
 	records := []experiment.Record{{ID: "trial & 雪", Title: `Trial <script>alert(1)</script>`}, {ID: "plain", Title: "Plain"}}
+	plot := &report.Data{X: []float64{0, 1}, Series: []report.Series{{Name: seriesName, Values: []*float64{&value, nil}}}, TotalRows: 2}
+	plot.Table = &report.DataWindow{X: plot.X, Series: plot.Series, StartRow: 1}
 	layout := &report.Report{Blocks: []report.Block{
 		{Type: "markdown", Markdown: "# Introduction\n\n**Measured** results.\n\n<script>alert(1)</script>\n\n[bad](javascript:alert%281%29) <javascript:alert(1)>\n\n[local](results/metrics.csv)\n\n[official](https://example.com/docs?q=1&lang=en)\n\n![Plot & example](https://example.com/private.png)\n"},
-		{Type: "row", Blocks: []report.Block{{Type: "line", Title: `Loss <img src=x>`, X: `step "<&`, Data: &report.Data{X: []float64{0, 1}, Series: []report.Series{{Name: seriesName, Values: []*float64{&value, nil}}}}}, {Type: "line", Title: "Throughput", Message: "Results unavailable"}}},
+		{Type: "row", Blocks: []report.Block{{Type: "line", Title: `Loss <img src=x>`, X: `step "<&`, Data: plot}, {Type: "line", Title: "Throughput", Message: "Results unavailable"}}},
 		{Type: "markdown", Markdown: "## Conclusions\n\nMore work needed."},
 	}}
 	body, err := web.Render(records, web.PageOptions{Project: "Report project", Reports: map[string]*report.Report{records[0].ID: layout}})
@@ -88,7 +90,9 @@ func TestReportLegendUsesPlotStroke(t *testing.T) {
 	for i := range series {
 		series[i] = report.Series{Name: "Series", Values: []*float64{&value}}
 	}
-	layout := &report.Report{Blocks: []report.Block{{Type: "line", Title: "Lines", X: "step", Data: &report.Data{X: []float64{0}, Series: series}}}}
+	plot := &report.Data{X: []float64{0}, Series: series, TotalRows: 1}
+	plot.Table = &report.DataWindow{X: plot.X, Series: plot.Series, StartRow: 1}
+	layout := &report.Report{Blocks: []report.Block{{Type: "line", Title: "Lines", X: "step", Data: plot}}}
 	body, err := web.Render([]experiment.Record{{ID: "trial"}}, web.PageOptions{Reports: map[string]*report.Report{"trial": layout}})
 	if err != nil {
 		t.Fatal(err)
@@ -112,5 +116,51 @@ func TestReportLegendUsesPlotStroke(t *testing.T) {
 		if !strings.Contains(rule, `[data-chart-type="line"]`) {
 			t.Errorf("line dash pattern applies to other chart types: %s", rule)
 		}
+	}
+}
+
+func TestReportSeparatesSampledPlotFromRecentRawTable(t *testing.T) {
+	window := &report.DataWindow{StartRow: 901, Series: []report.Series{{Name: "loss"}}}
+	for row := 901; row <= 1000; row++ {
+		value := float64(row) + 0.125
+		window.X = append(window.X, float64(row))
+		window.Series[0].Values = append(window.Series[0].Values, &value)
+	}
+	first, middle, last := 1.125, 500.125, 1000.125
+	layout := &report.Report{Blocks: []report.Block{{Type: "line", Title: "Loss", X: "step", Data: &report.Data{
+		X: []float64{1, 500, 1000}, Series: []report.Series{{Name: "loss", Values: []*float64{&first, &middle, &last}}},
+		TotalRows: 1000, Sampled: true, SourceID: "source-identity", Table: window,
+	}}}}
+	body, err := web.Render([]experiment.Record{{ID: "trial"}}, web.PageOptions{Reports: map[string]*report.Report{"trial": layout}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(body)
+	for _, want := range []string{
+		"Plot shows 3 sampled rows from 1000 recorded rows.", "latest 100 of 1000 recorded rows",
+		"Latest recorded rows 901–1000 of 1000.", `<td>901</td>`, `<td>901.125</td>`, `<td>1000</td>`,
+		`aria-describedby="report-747269616c-0-description"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("report missing %q", want)
+		}
+	}
+	if strings.Contains(page, `<td>851</td>`) || strings.Contains(page, `<td>500</td>`) {
+		t.Fatal("table contains older rows or sampled plot rows")
+	}
+	tbody := regexp.MustCompile(`(?s)<tbody>(.*?)</tbody>`).FindStringSubmatch(page)
+	if len(tbody) != 2 || strings.Count(tbody[1], `<tr>`) != 100 {
+		t.Fatal("raw table is not bounded to its latest 100 rows")
+	}
+	match := regexp.MustCompile(`<script type="application/json" class="chart-data">([^<]+)</script>`).FindStringSubmatch(page)
+	if len(match) != 2 || strings.Contains(match[1], `"table"`) {
+		t.Fatal("plot JSON missing or duplicates the raw table payload")
+	}
+	var plot report.Data
+	if err := json.Unmarshal([]byte(match[1]), &plot); err != nil {
+		t.Fatal(err)
+	}
+	if len(plot.X) != 3 || plot.TotalRows != 1000 || !plot.Sampled || plot.SourceID != "source-identity" {
+		t.Fatalf("bounded plot data or source metadata changed: %+v", plot)
 	}
 }

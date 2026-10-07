@@ -30,6 +30,8 @@ type reportBlockView struct {
 	JSON                         template.JS
 	Series                       []string
 	Rows                         [][]string
+	ChartSummary, TableSummary   string
+	TableCaption                 string
 	Blocks                       []reportBlockView
 }
 
@@ -58,24 +60,42 @@ func prepareReport(view experimentView, source *report.Report) (reportView, erro
 				item.Blocks = children
 			case "line":
 				if block.Data != nil {
-					encoded, err := json.Marshal(block.Data)
+					data := block.Data
+					total := data.TotalRows
+					encoded, err := json.Marshal(struct {
+						X         []float64       `json:"x"`
+						Series    []report.Series `json:"series"`
+						TotalRows int             `json:"totalRows"`
+						Sampled   bool            `json:"sampled"`
+						SourceID  string          `json:"sourceID,omitempty"`
+					}{data.X, data.Series, total, data.Sampled, data.SourceID})
 					if err != nil {
 						return nil, err
 					}
 					item.JSON = template.JS(encoded)
-					for _, series := range block.Data.Series {
+					for _, series := range data.Series {
 						item.Series = append(item.Series, series.Name)
 					}
-					for j, x := range block.Data.X {
+					item.ChartSummary = fmt.Sprintf("Plot shows all %d recorded rows.", total)
+					if data.Sampled {
+						item.ChartSummary = fmt.Sprintf("Plot shows %d sampled rows from %d recorded rows. Plotted values are recorded observations.", len(data.X), total)
+					}
+					for j, x := range data.Table.X {
 						row := []string{strconv.FormatFloat(x, 'g', -1, 64)}
-						for _, series := range block.Data.Series {
+						for _, series := range data.Table.Series {
 							value := "—"
-							if j < len(series.Values) && series.Values[j] != nil {
+							if series.Values[j] != nil {
 								value = strconv.FormatFloat(*series.Values[j], 'g', -1, 64)
 							}
 							row = append(row, value)
 						}
 						item.Rows = append(item.Rows, row)
+					}
+					item.TableSummary = fmt.Sprintf("%d recorded rows", total)
+					item.TableCaption = fmt.Sprintf("%s. All %d recorded rows. Missing values are shown as an em dash.", block.Title, total)
+					if len(item.Rows) < total {
+						item.TableSummary = fmt.Sprintf("latest %d of %d recorded rows", len(item.Rows), total)
+						item.TableCaption = fmt.Sprintf("%s. Latest recorded rows %d–%d of %d. Missing values are shown as an em dash.", block.Title, data.Table.StartRow, data.Table.StartRow+len(item.Rows)-1, total)
 					}
 				}
 			default:

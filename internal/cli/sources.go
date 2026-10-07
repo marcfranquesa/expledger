@@ -13,6 +13,15 @@ import (
 
 // loadSnapshot resolves all sources afresh; no partially read catalog is returned.
 func loadSnapshot(root string, override []string) (web.Snapshot, error) {
+	return loadReportsSnapshot(root, override, report.NewReader(false))
+}
+
+func liveSnapshotLoader(root string, override []string) func() (web.Snapshot, error) {
+	reader := report.NewReader(true)
+	return func() (web.Snapshot, error) { return loadReportsSnapshot(root, override, reader) }
+}
+
+func loadReportsSnapshot(root string, override []string, reader *report.Reader) (web.Snapshot, error) {
 	config, err := readProjectConfig(filepath.Join(root, "expledger.yaml"))
 	if err != nil {
 		return web.Snapshot{}, fmt.Errorf("read project %s: %w", root, err)
@@ -56,7 +65,7 @@ func loadSnapshot(root string, override []string) (web.Snapshot, error) {
 			snapshot.Records = append(snapshot.Records, record)
 			snapshot.Options.RemoteURLs[record.ID] = sourceConfig.RemoteURL
 		}
-		reports, err := report.ReadMany(path, ids, sourceConfig.Layout)
+		reports, err := reader.ReadMany(path, ids, sourceConfig.Layout)
 		if err != nil {
 			return web.Snapshot{}, fmt.Errorf("read source %s: %w", path, err)
 		}

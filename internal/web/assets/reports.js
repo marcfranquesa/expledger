@@ -1,11 +1,14 @@
 function initializeReports(container, saved = {}) {
   const plots = new Map();
+  const retained = {};
   container.querySelectorAll('[data-chart-type="line"]').forEach(figure => {
-    if (figure.querySelector('.chart-data')) plots.set(figure.dataset.blockKey, initializeLineChart(figure, saved[figure.dataset.blockKey]));
+    const key = figure.dataset.blockKey;
+    if (saved[key]) retained[key] = saved[key];
+    if (figure.querySelector('.chart-data')) plots.set(key, initializeLineChart(figure, saved[key]));
   });
   return {
     draw: () => plots.forEach(plot => { plot.draw(); plot.restoreScroll(); }),
-    capture: () => Object.fromEntries([...plots].map(([key, plot]) => [key, plot.capture()])),
+    capture: () => ({...retained, ...Object.fromEntries([...plots].map(([key, plot]) => [key, plot.capture()]))}),
     captureFocus: () => {
       const focused = document.activeElement;
       if (!container.contains(focused)) return null;

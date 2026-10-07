@@ -51,7 +51,10 @@ and flags, and [Experiment format](format.md) for metadata and filesystem rules.
 
 Experiments can also declare [reports](reports.md) with local Markdown and CSV
 results. Both `build` and `serve` include those reports; `serve` refreshes their
-layout, prose, and data alongside the catalog.
+layout, prose, and data alongside the catalog. The report guide includes
+[CSV logging](reports.md#logging-results-while-an-experiment-runs) and
+[SSH forwarding](reports.md#monitor-a-remote-project-over-ssh) for monitoring a
+workload from another terminal or machine.
 
 ## Experiment graph
 
@@ -89,7 +92,8 @@ Repeat `--source` once per root. Relative CLI paths also resolve from the discov
 project config directory. Empty values are errors. The override remains active
 until the server stops, while other config changes are still reread.
 
-The browser polls every three seconds after the previous request finishes. Valid
+The browser polls every three seconds after the previous request finishes, with
+a ten-second request timeout. Valid
 metadata, source order, relationships, and remote-link changes appear without a
 restart or page reload. The selected list/graph view, graph zoom, search text, and selected experiment
 are retained. Refreshed search results and details use current records. Page and

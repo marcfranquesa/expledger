@@ -33,7 +33,7 @@ func serveExperimentsCommand(app *application) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			load := func() (web.Snapshot, error) { return loadSnapshot(app.projectRoot, sources) }
+			load := liveSnapshotLoader(app.projectRoot, sources)
 			if _, err := load(); err != nil {
 				return err
 			}
