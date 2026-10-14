@@ -63,7 +63,7 @@ Report the first error with its file path; no files are changed.`
 const buildDescription = "Build a static experiment web page"
 
 const buildDetails = `Write a self-contained index.html snapshot, newest experiments first.
-Include optional report.yaml blocks and their Markdown and CSV sources.
+Include optional report.yaml blocks and their Markdown, CSV, and PNG or JPEG sources.
 Create the output directory if needed and replace its index.html on each build.
 Other files in the directory are left unchanged. The root expledger.yaml's optional
 remote_url supplies the full browser URL of the remote experiments directory.
@@ -74,7 +74,7 @@ The generated page needs no running ExpLedger server and does not poll.`
 const serveDescription = "Browse experiments in a local web page"
 
 const serveDetails = `Serve experiments on 127.0.0.1 with live list and lineage views.
-Include optional report.yaml blocks with shared chart styling.
+Include optional report.yaml blocks with Markdown, charts, and PNG or JPEG images.
 Poll configuration, records, and report sources every few seconds without reloading the page.
 Use sources in expledger.yaml, or repeat --source to replace that list.
 Paths name project roots; relative paths resolve from the current project config

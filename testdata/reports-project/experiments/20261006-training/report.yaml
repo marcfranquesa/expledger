@@ -16,5 +16,12 @@ blocks:
         x: step
         y: [tokens_per_second]
 
-  - type: markdown
-    source: conclusions.md
+  - type: row
+    blocks:
+      - type: image
+        source: results/confusion-matrix.png
+        alt: Confusion matrix with 98 and 95 correct predictions, and 2 and 5 errors.
+        title: Illustrative validation confusion matrix
+
+      - type: markdown
+        source: conclusions.md

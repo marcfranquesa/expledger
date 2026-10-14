@@ -21,6 +21,11 @@
   <section class="report-markdown" data-block-key="{{.Key}}">{{if .Message}}<p class="report-unavailable">{{.Message}}</p>{{else}}{{.Markdown}}{{end}}</section>
 {{else if eq .Type "row"}}
   <div class="report-row">{{range .Blocks}}{{template "report-block" .}}{{end}}</div>
+{{else if eq .Type "image"}}
+  <figure class="report-image" data-block-key="{{.Key}}">
+    {{if .Title}}<figcaption><h2>{{.Title}}</h2></figcaption>{{end}}
+    {{if .ImageURL}}<img src="{{.ImageURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}">{{else}}<p class="report-unavailable">{{.Message}}</p>{{end}}
+  </figure>
 {{else if eq .Type "line"}}
   <figure class="report-chart" data-block-key="{{.Key}}" data-chart-type="line">
     <figcaption><h2 id="{{.Key}}-title">{{.Title}}</h2></figcaption>

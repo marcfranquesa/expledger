@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -26,12 +27,14 @@ type reportView struct {
 }
 
 type reportBlockView struct {
-	Type, Title, X, Message, Key string
-	Markdown                     template.HTML
-	JSON                         template.JS
-	Series                       []string
-	Rows                         [][]string
-	Blocks                       []reportBlockView
+	Type, Title, Alt, X, Message, Key string
+	ImageURL                          template.URL
+	Width, Height                     int
+	Markdown                          template.HTML
+	JSON                              template.JS
+	Series                            []string
+	Rows                              [][]string
+	Blocks                            []reportBlockView
 }
 
 func reportAnchor(id string) string { return "report-" + hex.EncodeToString([]byte(id)) }
@@ -43,7 +46,7 @@ func prepareReport(view experimentView, source *report.Report) (reportView, erro
 		views := make([]reportBlockView, 0, len(blocks))
 		for i, block := range blocks {
 			key := prefix + "-" + strconv.Itoa(i)
-			item := reportBlockView{Type: block.Type, Title: block.Title, X: block.X, Message: block.Message, Key: key}
+			item := reportBlockView{Type: block.Type, Title: block.Title, Alt: block.Alt, X: block.X, Message: block.Message, Key: key}
 			switch block.Type {
 			case "markdown":
 				var body bytes.Buffer
@@ -57,6 +60,14 @@ func prepareReport(view experimentView, source *report.Report) (reportView, erro
 					return nil, err
 				}
 				item.Blocks = children
+			case "image":
+				if block.Image != nil {
+					if block.Image.MIME != "image/png" && block.Image.MIME != "image/jpeg" {
+						return nil, fmt.Errorf("unsupported image MIME type %q", block.Image.MIME)
+					}
+					item.ImageURL = template.URL("data:" + block.Image.MIME + ";base64," + base64.StdEncoding.EncodeToString(block.Image.Data))
+					item.Width, item.Height = block.Image.Width, block.Image.Height
+				}
 			case "line":
 				if block.Data != nil {
 					encoded, err := json.Marshal(block.Data)
@@ -91,8 +102,7 @@ func prepareReport(view experimentView, source *report.Report) (reportView, erro
 	return result, err
 }
 
-// Images are represented by their alt text: report pages never load an asset
-// that is unavailable in the single-file build or initiate remote image requests.
+// Markdown images remain alt text; explicit image blocks embed validated local files.
 type reportAssetRenderer struct{}
 
 func (reportAssetRenderer) RegisterFuncs(register renderer.NodeRendererFuncRegisterer) {

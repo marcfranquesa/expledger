@@ -15,11 +15,13 @@ import (
 )
 
 func TestReadRejectsFIFOWithoutBlocking(t *testing.T) {
-	for _, name := range []string{"report.yaml", "results.csv"} {
+	for _, name := range []string{"report.yaml", "results.csv", "figure.png"} {
 		t.Run(name, func(t *testing.T) {
 			manifest := lineManifest("results.csv")
 			if name == "report.yaml" {
 				manifest = ""
+			} else if name == "figure.png" {
+				manifest = imageManifest(name)
 			}
 			root, dir := reportFixture(t, manifest, nil)
 			if err := syscall.Mkfifo(filepath.Join(dir, name), 0o600); err != nil {

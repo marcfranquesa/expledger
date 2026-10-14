@@ -10,7 +10,9 @@ related plots, and interpretation together. They are not measured results.
 - Leave a validation value blank when an evaluation is unavailable.
 
 Both charts read `results/metrics.csv`. A row keeps the plots together on a wide
-screen and stacks them on a smaller screen.
+screen and stacks them on a smaller screen. A second row places an illustrative
+PNG confusion matrix beside the conclusions; the image is embedded in the
+snapshot and preserves its aspect ratio.
 
 ```yaml
 x: step

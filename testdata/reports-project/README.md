@@ -1,7 +1,8 @@
 # Report preview fixture
 
-These two experiments demonstrate report layout and the results-unavailable
-state. All training metrics and findings are illustrative, not measured results.
+These two experiments demonstrate responsive report layout, embedded PNG images,
+and the results-unavailable state. All training metrics, images, and findings are
+illustrative, not measured results.
 
 From this directory, run a built ExpLedger binary:
 

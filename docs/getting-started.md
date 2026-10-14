@@ -67,9 +67,9 @@ expledger run YYYYMMDD-baseline
 Record findings and links to results in the experiment's README after the run.
 ExpLedger leaves these notes and the metadata unchanged.
 
-To display prose and result charts in the browser, add an optional `report.yaml`
-beside the metadata. [Experiment reports](reports.md) shows how to combine
-Markdown, line charts, and rows with shared default styling.
+To display prose, result charts, and images in the browser, add an optional
+`report.yaml` beside the metadata. [Experiment reports](reports.md) shows how to combine
+Markdown, line charts, and PNG or JPEG images in responsive rows.
 
 ## Browse and share a catalog
 

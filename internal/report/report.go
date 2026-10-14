@@ -15,31 +15,44 @@ import (
 )
 
 const (
-	maxManifestBytes = 256 << 10
-	maxMarkdownBytes = 1 << 20
-	maxCSVBytes      = 8 << 20
-	maxSourceBytes   = 16 << 20
-	maxBlocks        = 64
-	maxSeries        = 8
-	maxCSVRows       = 10000
-	maxReportValues  = 100000
+	maxManifestBytes    = 256 << 10
+	maxMarkdownBytes    = 1 << 20
+	maxCSVBytes         = 8 << 20
+	maxImageBytes       = 8 << 20
+	maxImagePixels      = 16000000
+	maxSourceBytes      = 16 << 20
+	maxReportImageBytes = 16 << 20
+	maxBlocks           = 64
+	maxSeries           = 8
+	maxCSVRows          = 10000
+	maxReportValues     = 100000
 )
 
 type Report struct {
 	Blocks []Block `json:"blocks"`
 }
 
-// Block keeps chart selection separate from presentation, which belongs to the renderer.
+// Block keeps source selection separate from presentation, which belongs to the renderer.
 type Block struct {
 	Type     string   `json:"type"`
 	Source   string   `json:"source,omitempty"`
 	Title    string   `json:"title,omitempty"`
+	Alt      string   `json:"alt,omitempty"`
 	X        string   `json:"x,omitempty"`
 	Y        []string `json:"y,omitempty"`
 	Blocks   []Block  `json:"blocks,omitempty"`
 	Markdown string   `json:"markdown,omitempty"`
 	Data     *Data    `json:"data,omitempty"`
+	Image    *Image   `json:"image,omitempty"`
 	Message  string   `json:"message,omitempty"`
+}
+
+// Image holds validated PNG or JPEG bytes and their intrinsic dimensions.
+type Image struct {
+	Data   []byte `json:"data"`
+	MIME   string `json:"mime"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 type Data struct {
@@ -53,7 +66,7 @@ type Series struct {
 }
 
 // Read returns nil when report.yaml is absent. Sources are confined to the experiment
-// directory; missing chart results remain visible as unavailable blocks.
+// directory; missing generated results remain visible as unavailable blocks.
 func Read(root, id string, layout catalog.Layout) (*Report, error) {
 	reports, err := ReadMany(root, []string{id}, layout)
 	return reports[id], err
@@ -119,6 +132,7 @@ func readExperiment(project *os.Root, directory, id string) (*Report, error) {
 type sourceFile struct {
 	data    []byte
 	missing bool
+	image   *Image
 }
 
 type sourceLoader struct {
@@ -126,6 +140,7 @@ type sourceLoader struct {
 	files       map[string]sourceFile
 	bytes       int
 	chartValues int
+	imageBytes  int
 }
 
 func (loader *sourceLoader) source(name string, limit int) (sourceFile, error) {
@@ -161,6 +176,8 @@ func (loader *sourceLoader) load(blocks []Block, location string) error {
 		limit := maxMarkdownBytes
 		if block.Type == "line" {
 			limit = maxCSVBytes
+		} else if block.Type == "image" {
+			limit = maxImageBytes
 		}
 		file, err := loader.source(block.Source, limit)
 		if err != nil {
@@ -171,6 +188,25 @@ func (loader *sourceLoader) load(blocks []Block, location string) error {
 				return fmt.Errorf("%s: %s: %w", where, block.Source, os.ErrNotExist)
 			}
 			block.Markdown = string(file.data)
+			continue
+		}
+		if block.Type == "image" {
+			if file.missing {
+				block.Message = "Image unavailable"
+				continue
+			}
+			loader.imageBytes += len(file.data)
+			if loader.imageBytes > maxReportImageBytes {
+				return fmt.Errorf("%s: image data exceeds %d bytes per report including repeated blocks", where, maxReportImageBytes)
+			}
+			if file.image == nil {
+				file.image, err = parseImage(file.data)
+				if err != nil {
+					return fmt.Errorf("%s: %s: %w", where, block.Source, err)
+				}
+				loader.files[block.Source] = file
+			}
+			block.Image = file.image
 			continue
 		}
 		if !file.missing {
