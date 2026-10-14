@@ -139,6 +139,8 @@ func parseBlocks(node *yaml.Node, location string, insideRow bool, count *int) (
 		case "markdown":
 		case "line":
 			allowed = append(allowed, "title", "x", "y")
+		case "image":
+			allowed = append(allowed, "alt", "title")
 		case "row":
 			if insideRow {
 				return nil, fmt.Errorf("%s: nested rows are unsupported", where)
@@ -161,6 +163,16 @@ func parseBlocks(node *yaml.Node, location string, insideRow bool, count *int) (
 			}
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", where, err)
+			}
+			if kind == "image" {
+				if block.Alt, err = nonemptyString(fields["alt"], where+".alt"); err != nil {
+					return nil, err
+				}
+				if title, ok := fields["title"]; ok {
+					if block.Title, err = nonemptyString(title, where+".title"); err != nil {
+						return nil, err
+					}
+				}
 			}
 			if kind == "line" {
 				if block.Title, err = nonemptyString(fields["title"], where+".title"); err != nil {
